@@ -20,6 +20,7 @@ import { supabase } from './lib/supabase';
 import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ProductsPage from './pages/ProductsPage';
+import PosPage from './pages/PosPage';
 import CategoriesPage from './pages/CategoriesPage';
 import { usePermissions } from './hooks/usePermissions';
 
@@ -55,7 +56,7 @@ function AuthRoutes() { return <Routes>
       <Route path="/" element={<DashboardPage />} />
       <Route path="/products" element={<ProductsPage />} />
       <Route path="/categories" element={<OwnerCategoriesRoute />} />
-      <Route path="/pos" element={<ComingSoonPage />} />
+      <Route path="/pos" element={<PosPage />} />
       <Route element={<PinProtected />}>
         <Route path="/staff" element={<StaffManagementPage />} />
         <Route path="/change-pin" element={<ChangePinPage />} />

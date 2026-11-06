@@ -12,3 +12,7 @@ button, input { font: inherit; }
   .button-secondary { @apply min-h-11 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700 disabled:opacity-50; }
   .button-danger { @apply min-h-11 rounded-xl border border-red-900 bg-red-950/50 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-900/50 disabled:opacity-50; }
 }
+
+body.barcode-scanner-active { background: transparent !important; }
+body.barcode-scanner-active #root { background: transparent !important; }
+body.barcode-scanner-active .fixed.inset-0.z-50 { background: transparent !important; backdrop-filter: none !important; }

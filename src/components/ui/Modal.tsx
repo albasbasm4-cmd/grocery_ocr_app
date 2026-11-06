@@ -9,6 +9,7 @@ export interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'full';
+  transparent?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -19,6 +20,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   footer,
   maxWidth = 'md',
+  transparent = false,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,13 +48,13 @@ export const Modal: React.FC<ModalProps> = ({
   return (
     <div
       dir="rtl"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200 ${transparent ? 'bg-transparent' : 'bg-slate-950/80 backdrop-blur-sm'}`}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className={`w-full ${widthClasses} bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-4 duration-200`}
+        className={`w-full ${widthClasses} ${transparent ? 'bg-transparent border-transparent shadow-none' : 'bg-slate-900 border border-slate-800 shadow-2xl'} rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-4 duration-200`}
         role="dialog"
         aria-modal="true"
       >
@@ -74,7 +76,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Body */}
-        <div className="p-5 overflow-y-auto flex-1">{children}</div>
+        <div className={`overflow-y-auto flex-1 ${transparent ? 'p-0' : 'p-5'}`}>{children}</div>
 
         {/* Footer */}
         {footer && <div className="p-4 bg-slate-950/50 border-t border-slate-800 flex justify-end gap-3">{footer}</div>}

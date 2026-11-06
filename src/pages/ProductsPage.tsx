@@ -23,6 +23,9 @@ import { fetchCategories } from '../services/categoriesService';
 import { adjustProductStockRpc, createProduct, fetchProductCosts, fetchProducts, setProductActive, updateProduct, type ProductInput } from '../services/productsService';
 import type { Category, Product } from '../types';
 import { Link } from 'react-router-dom';
+import { BarcodeScanner } from '../components/BarcodeScanner';
+import { lookupProductsByCode } from '../services/barcodeLookupService';
+import { ScanLine } from 'lucide-react';
 
 const PAGE_SIZE = 40;
 
@@ -46,6 +49,8 @@ export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [formOpen, setFormOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
@@ -196,7 +201,8 @@ export default function ProductsPage() {
           <p className="mt-1 text-xs text-slate-400">{products.length}</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/categories" aria-label={ar.manageCategories} className="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm font-bold text-slate-200"><FolderTree className="h-4 w-4" /><span className="hidden sm:inline">{ar.manageCategories}</span></Link>
+          {isOwner && <Link to="/categories" aria-label={ar.manageCategories} className="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm font-bold text-slate-200"><FolderTree className="h-4 w-4" /><span className="hidden sm:inline">{ar.manageCategories}</span></Link>}
+          <Button variant="outline" icon={<ScanLine className="h-4 w-4" />} onClick={() => setScannerOpen(true)}>{ar.scanProduct}</Button>
           {isOwner && <Button icon={<PackagePlus className="h-4 w-4" />} onClick={openCreate}>{ar.addNewProduct}</Button>}
         </div>
       </div>
@@ -263,7 +269,15 @@ export default function ProductsPage() {
         </div>
       )}
 
-      <ProductForm isOpen={formOpen} onClose={() => { setFormOpen(false); setEditingProduct(null); }} onSubmit={onProductSubmit} categories={categories} product={editingProduct} isSaving={createMutation.isPending || updateMutation.isPending} canSeeCost={canSeeCost} />
+      <BarcodeScanner isOpen={scannerOpen} storeId={store?.id || ''} onClose={() => setScannerOpen(false)} onCode={(code) => {
+        void lookupProductsByCode(store?.id || '', code).then((found) => {
+          if (found.length === 1) setDetailProduct(found[0]!);
+          else if (found.length > 1) showToast(ar.chooseProduct, 'info');
+          else if (isOwner) { setFormOpen(true); setEditingProduct(null); setScannedBarcode(code); }
+          else showToast(ar.codeNotFoundStaff, 'error');
+        }).catch((error: unknown) => showToast(error instanceof Error ? error.message : ar.genericError, 'error'));
+      }} onProduct={(product) => setDetailProduct(product)} />
+      <ProductForm isOpen={formOpen} onClose={() => { setFormOpen(false); setEditingProduct(null); setScannedBarcode(''); }} onSubmit={onProductSubmit} categories={categories} product={editingProduct} isSaving={createMutation.isPending || updateMutation.isPending} canSeeCost={canSeeCost} storeId={store?.id || ''} initialBarcode={scannedBarcode} />
       <ProductDetailModal product={detailProduct} isOpen={Boolean(detailProduct)} onClose={() => setDetailProduct(null)} canSeeCost={canSeeCost} />
       <StockAdjustmentModal product={stockProduct} isOpen={Boolean(stockProduct)} onClose={() => setStockProduct(null)} isSaving={stockMutation.isPending} onSubmit={async (quantity, reason) => {
         if (!stockProduct) return;

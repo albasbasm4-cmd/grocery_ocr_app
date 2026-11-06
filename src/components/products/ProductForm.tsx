@@ -7,6 +7,10 @@ import { ar } from '../../i18n/ar';
 import type { Product, ProductUnit } from '../../types';
 import type { ProductInput } from '../../services/productsService';
 import type { Category } from '../../types';
+import { BarcodeScanner } from '../BarcodeScanner';
+import { ScanLine } from 'lucide-react';
+import { SmallNumberOcrButton } from './SmallNumberOcrButton';
+import { toLatinDigits } from '../../lib/numbers';
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -16,6 +20,8 @@ interface ProductFormProps {
   product?: Product | null;
   isSaving?: boolean;
   canSeeCost: boolean;
+  storeId: string;
+  initialBarcode?: string;
 }
 
 const UNIT_OPTIONS: Array<{ value: ProductUnit; label: string }> = [
@@ -28,7 +34,7 @@ const UNIT_OPTIONS: Array<{ value: ProductUnit; label: string }> = [
   { value: 'other', label: ar.unitOther },
 ];
 
-export function ProductForm({ isOpen, onClose, onSubmit, categories, product, isSaving, canSeeCost }: ProductFormProps) {
+export function ProductForm({ isOpen, onClose, onSubmit, categories, product, isSaving, canSeeCost, storeId, initialBarcode }: ProductFormProps) {
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -40,13 +46,14 @@ export function ProductForm({ isOpen, onClose, onSubmit, categories, product, is
   const [minStock, setMinStock] = useState('0');
   const [expiry, setExpiry] = useState('');
   const [error, setError] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setName(product?.name ?? '');
     setCategoryId(product?.category_id ?? '');
-    setBarcode(product?.barcode ?? '');
-    setSku(product?.sku_small_text ?? '');
+    setBarcode(toLatinDigits(product?.barcode ?? initialBarcode ?? ''));
+    setSku(toLatinDigits(product?.sku_small_text ?? ''));
     setUnit(product?.unit ?? 'piece');
     setPrice(product?.price ?? '0');
     setCost(product?.cost_price ?? '0');
@@ -54,7 +61,7 @@ export function ProductForm({ isOpen, onClose, onSubmit, categories, product, is
     setMinStock(product?.min_stock ?? '0');
     setExpiry(product?.expiry_date ?? '');
     setError('');
-  }, [isOpen, product]);
+  }, [isOpen, product, initialBarcode]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -98,10 +105,10 @@ export function ProductForm({ isOpen, onClose, onSubmit, categories, product, is
         </label>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block text-sm font-semibold text-slate-300">{ar.barcode}
-            <input className="field mt-2 font-sans" dir="ltr" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+            <div className="mt-2 flex gap-2"><input className="field min-w-0 flex-1 font-sans" dir="ltr" value={barcode} onChange={(e) => setBarcode(toLatinDigits(e.target.value))} /><Button type="button" variant="outline" onClick={() => setScannerOpen(true)} aria-label={ar.scanProduct}><ScanLine className="h-4 w-4" /></Button></div>
           </label>
           <label className="block text-sm font-semibold text-slate-300">{ar.skuSmallText}
-            <input className="field mt-2 font-sans" dir="ltr" value={sku} onChange={(e) => setSku(e.target.value)} />
+            <div className="mt-2 flex gap-2"><input className="field min-w-0 flex-1 font-sans" dir="ltr" value={sku} onChange={(e) => setSku(toLatinDigits(e.target.value))} /><SmallNumberOcrButton onConfirm={setSku} /></div>
           </label>
         </div>
         <label className="block text-sm font-semibold text-slate-300">{ar.unit}
@@ -124,6 +131,7 @@ export function ProductForm({ isOpen, onClose, onSubmit, categories, product, is
           <Button type="button" variant="outline" onClick={onClose}>{ar.cancel}</Button>
         </div>
       </form>
+      <BarcodeScanner isOpen={scannerOpen} storeId={storeId} onClose={() => setScannerOpen(false)} onCode={(code) => setBarcode(code)} />
     </Modal>
   );
 }

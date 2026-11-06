@@ -33,12 +33,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- تنزيل حزم Google ML Kit للباركود وقراءة النصوص تلقائياً عند تثبيت التطبيق -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode,ocr" />
     </application>
 
-    <!-- Permissions: الكاميرا لمسح الباركود، والإنترنت لمزامنة البيانات السحابية (بدون أذونات غير لازمة) -->
+    <!-- Permissions: الكاميرا لمسح الباركود، الاهتزاز للتنبيه، والإنترنت لمزامنة البيانات السحابية -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
 </manifest>

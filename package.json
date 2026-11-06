@@ -12,11 +12,17 @@
     "cap:android": "cap open android"
   },
   "dependencies": {
+    "@capacitor-mlkit/barcode-scanning": "^8.2.2",
+    "@capacitor-mlkit/text-recognition": "^8.2.2",
     "@capacitor/app": "^8.1.2",
+    "@capacitor/camera": "^8.2.6",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/haptics": "^8.0.2",
     "@fontsource/cairo": "^5.3.0",
     "@supabase/supabase-js": "^2.119.0",
     "@tanstack/react-query": "^5.107.0",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "decimal.js": "^10.4.3",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
