@@ -2,6 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { RequireAuth } from './components/RequireAuth';
 import { PinProtected } from './components/PinProtected';
+import { AppLayout } from './components/layout/AppLayout';
+import { ToastProvider } from './contexts/ToastContext';
+import { ToastContainer } from './components/ui/Toast';
+import { SettingsProvider } from './contexts/SettingsContext';
 import AuthPage from './pages/AuthPage';
 import StoreSetupPage from './pages/StoreSetupPage';
 import DashboardPage from './pages/DashboardPage';
@@ -9,6 +13,8 @@ import StaffManagementPage from './pages/StaffManagementPage';
 import ChangePinPage from './pages/ChangePinPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import SettingsPage from './pages/SettingsPage';
+import ComingSoonPage from './pages/ComingSoonPage';
 import { ar } from './i18n/ar';
 import { supabase } from './lib/supabase';
 import { useEffect, useState } from 'react';
@@ -41,12 +47,25 @@ function AuthRoutes() { return <Routes>
   <Route path="/setup" element={<SetupRoute />} />
   <Route path="/unauthorized" element={<UnauthorizedPage />} />
   <Route element={<RequireAuth />}>
-    <Route path="/" element={<DashboardPage />} />
-    <Route element={<PinProtected />}>
-      <Route path="/staff" element={<StaffManagementPage />} />
-      <Route path="/change-pin" element={<ChangePinPage />} />
+    <Route element={<AppLayout />}>
+      <Route path="/" element={<DashboardPage />} />
+      <Route path="/products" element={<ComingSoonPage />} />
+      <Route path="/pos" element={<ComingSoonPage />} />
+      <Route element={<PinProtected />}>
+        <Route path="/staff" element={<StaffManagementPage />} />
+        <Route path="/change-pin" element={<ChangePinPage />} />
+      </Route>
+      <Route path="/reports" element={<OwnerOnlyRoute />} />
+      <Route path="/settings" element={<SettingsPage />} />
     </Route>
   </Route>
   <Route path="*" element={<Navigate to="/" replace />} />
 </Routes>; }
-export default function App() { return <BrowserRouter><AuthProvider><AuthRoutes /></AuthProvider></BrowserRouter>; }
+function OwnerOnlyRoute() {
+  const { role } = useAuth();
+  if (role !== 'owner') return <Navigate to="/unauthorized" replace />;
+  return <ComingSoonPage />;
+}
+export default function App() {
+  return <ToastProvider><SettingsProvider><BrowserRouter><AuthProvider><AuthRoutes /></AuthProvider></BrowserRouter><ToastContainer /></SettingsProvider></ToastProvider>;
+}

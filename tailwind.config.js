@@ -7,7 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        cairo: ['Cairo', 'system-ui', 'sans-serif'],
+        sans: ['Cairo', 'system-ui', '-apple-system', 'sans-serif'],
+        cairo: ['Cairo', 'system-ui', '-apple-system', 'sans-serif'],
       },
     },
   },
