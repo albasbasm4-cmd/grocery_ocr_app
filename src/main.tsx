@@ -4,10 +4,4 @@ import App from './App';
 import './index.css';
 
 const rootElement = document.getElementById('root');
-if (rootElement) {
-  ReactDOM.createRoot(rootElement).render(
-    <StrictMode>
-      <App />
-    </StrictMode>
-  );
-}
+if (rootElement) ReactDOM.createRoot(rootElement).render(<StrictMode><App /></StrictMode>);

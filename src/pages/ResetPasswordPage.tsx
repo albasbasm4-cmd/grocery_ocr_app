@@ -1,0 +1,8 @@
+import { useState, type FormEvent } from 'react';
+import { supabase } from '../lib/supabase';
+import { ar } from '../i18n/ar';
+export default function ResetPasswordPage() {
+  const [password, setPassword] = useState(''); const [confirm, setConfirm] = useState(''); const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setError(''); setNotice(''); if (password.length < 8) { setError(ar.weakPassword); return; } if (password !== confirm) { setError(ar.passwordMismatch); return; } setBusy(true); const { error: updateError } = await supabase.auth.updateUser({ password }); setBusy(false); if (updateError) setError(updateError.message); else setNotice(ar.passwordChanged); }
+  return <main className="grid min-h-screen place-items-center p-4"><form onSubmit={submit} className="w-full max-w-md space-y-4 rounded-3xl border border-slate-700 bg-slate-900 p-6"><h1 className="text-2xl font-bold">{ar.setNewPassword}</h1><label className="block text-sm">{ar.password}<input className="field mt-2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label><label className="block text-sm">{ar.confirmPassword}<input className="field mt-2" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} /></label>{error && <p role="alert" className="text-sm text-red-300">{error}</p>}{notice && <p role="status" className="text-sm text-emerald-300">{notice}</p>}<button className="button-primary w-full" disabled={busy}>{busy ? ar.loading : ar.save}</button></form></main>;
+}
