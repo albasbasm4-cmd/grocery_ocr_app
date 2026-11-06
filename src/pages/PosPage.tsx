@@ -1,59 +1,300 @@
 import { useState } from 'react';
-import { BarcodeScanner } from '../components/BarcodeScanner';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { EmptyState } from '../components/ui/EmptyState';
+import { ScanLine, ShoppingBasket, Trash2, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
+import { useCart } from '../contexts/CartContext';
+import { BarcodeScanner } from '../components/BarcodeScanner';
+import { CartItemRow } from '../components/pos/CartItemRow';
+import { DiscountSection } from '../components/pos/DiscountSection';
+import { PaymentMethodSelector } from '../components/pos/PaymentMethodSelector';
+import { PosProductSearch } from '../components/pos/PosProductSearch';
+import { SaleSuccessModal } from '../components/pos/SaleSuccessModal';
+import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
 import { ar } from '../i18n/ar';
-import type { Product } from '../types';
+import { formatCurrencyDisplay } from '../lib/numbers';
+import { processSale } from '../services/salesService';
 import { lookupProductsByCode } from '../services/barcodeLookupService';
-import { ScanLine, ShoppingBasket } from 'lucide-react';
-
-interface CartLine { product: Product; quantity: number }
+import type { PrintableReceipt, Product } from '../types';
 
 export default function PosPage() {
-  const { store } = useAuth();
-  const { formatCurrency, formatNumber } = useSettings();
+  const auth = useAuth() as any;
+  const store = auth.store || auth.currentStore;
+  const { numberFormat } = useSettings();
   const { showToast } = useToast();
+
+  const {
+    items,
+    discountAmount,
+    totalAmount,
+    subtotal,
+    paymentMethod,
+    selectedCustomer,
+    addItem,
+    updateItemQuantity,
+    removeItem,
+    clearCart,
+  } = useCart();
+
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [manualCode, setManualCode] = useState('');
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successReceipt, setSuccessReceipt] = useState<PrintableReceipt | null>(null);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [choices, setChoices] = useState<Product[]>([]);
 
-  const addProduct = (product: Product) => {
-    setCart((current) => {
-      const existing = current.find((line) => line.product.id === product.id);
-      return existing ? current.map((line) => line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line) : [...current, { product, quantity: 1 }];
-    });
-    setChoices([]);
+  const currencySymbol = store?.currency_symbol || 'ر.س';
+
+  const handleProductSelected = (product: Product) => {
+    const res = addItem(product, '1');
+    if (!res.success) {
+      showToast(res.error || ar.stockInvalid, 'error');
+    }
   };
 
-  const handleCode = async (code: string) => {
+  const handleBarcodeScanned = async (code: string) => {
     if (!store) return;
     try {
       const found = await lookupProductsByCode(store.id, code);
-      if (!found.length) { showToast(ar.codeNotFound, 'error'); return; }
-      if (found.length === 1) addProduct(found[0]!);
-      else setChoices(found);
-    } catch (error) { showToast(error instanceof Error ? error.message : ar.genericError, 'error'); }
+      if (!found.length) {
+        showToast(ar.codeNotFound, 'error');
+        return;
+      }
+      if (found.length === 1) {
+        handleProductSelected(found[0]!);
+      } else {
+        setChoices(found);
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : ar.genericError, 'error');
+    }
   };
 
-  const submitManual = () => {
-    const code = manualCode.trim();
-    if (!code) return;
-    void handleCode(code);
-    setManualCode('');
+  const handleConfirmSale = async () => {
+    if (!store) return;
+
+    if (items.length === 0) {
+      showToast('السلة فارغة، أضف منتجات قبل تأكيد البيع.', 'error');
+      return;
+    }
+
+    if (paymentMethod === 'credit' && !selectedCustomer) {
+      showToast(ar.customerRequiredForCredit, 'error');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const clientUuid =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+
+      const salePayload = {
+        storeId: store.id,
+        clientUuid,
+        items: items.map((i) => ({
+          product_id: i.product.id,
+          quantity: Number(i.quantity),
+        })),
+        discountAmount,
+        paymentMethod,
+        customerId: paymentMethod === 'credit' ? selectedCustomer?.id : null,
+      };
+
+      const result = await processSale(salePayload);
+      const confirmedSale = result.sale;
+
+      // إعداد بيانات الإيصال الجاهز للطباعة والمشاركة
+      const receiptData: PrintableReceipt = {
+        storeName: store.name,
+        currencySymbol,
+        saleId: confirmedSale.id,
+        createdAt: confirmedSale.created_at,
+        paymentMethod: confirmedSale.payment_method,
+        customerName: selectedCustomer ? selectedCustomer.name : null,
+        items: items.map((i) => ({
+          name: i.product.name,
+          quantity: i.quantity,
+          unitPrice: i.product.price,
+          lineTotal: (Number(i.quantity) * Number(i.product.price)).toFixed(2),
+          unit: i.product.unit,
+        })),
+        subtotal,
+        discountAmount,
+        totalAmount,
+      };
+
+      // تفريغ السلة وفتح نافذة النجاح
+      clearCart();
+      setSuccessReceipt(receiptData);
+      setIsSuccessModalOpen(true);
+      showToast(ar.saleSuccessDesc, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'فشلت عملية البيع.';
+      showToast(msg, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const total = cart.reduce((sum, line) => sum + Number(line.product.price) * line.quantity, 0);
+  return (
+    <div className="space-y-4 pb-28 max-w-3xl mx-auto" dir="rtl">
+      {/* الترويسة وأزرار الإجراءات السريعة */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-extrabold text-white">{ar.posTitle}</h1>
+          <p className="text-xs text-slate-400 mt-0.5">{ar.scanToAdd}</p>
+        </div>
 
-  return <div className="space-y-4 pb-6" dir="rtl">
-    <div className="flex items-center justify-between"><div><h1 className="text-xl font-extrabold text-white">{ar.navPos}</h1><p className="mt-1 text-xs text-slate-400">{ar.scanToAdd}</p></div><Button icon={<ScanLine className="h-4 w-4" />} onClick={() => setScannerOpen(true)}>{ar.scanProduct}</Button></div>
-    <Card className="space-y-3 p-3"><label className="text-sm font-bold text-slate-200">{ar.manualBarcodeSku}<input className="field mt-2" dir="auto" value={manualCode} onChange={(event) => setManualCode(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); submitManual(); } }} /></label><Button className="w-full" variant="outline" disabled={!manualCode.trim()} onClick={submitManual}>{ar.searchCode}</Button></Card>
-    {choices.length > 0 && <Card className="space-y-2 p-3"><p className="font-bold text-white">{ar.chooseProduct}</p>{choices.map((product) => <button key={product.id} onClick={() => addProduct(product)} className="flex w-full items-center justify-between rounded-xl bg-slate-800 p-3 text-right"><span className="font-bold text-white">{product.name}</span><span className="text-sm text-slate-300">{formatCurrency(product.price, store?.currency_symbol || 'ر.س', 2)}</span></button>)}</Card>}
-    {cart.length === 0 ? <EmptyState icon={<ShoppingBasket className="h-8 w-8" />} title={ar.cartEmpty} description={ar.scanToAdd} /> : <div className="space-y-2">{cart.map(({ product, quantity }) => <Card key={product.id} className="flex items-center justify-between gap-3 p-3"><div className="min-w-0"><p className="truncate font-bold text-white">{product.name}</p><p className="text-xs text-slate-400">{formatCurrency(product.price, store?.currency_symbol || 'ر.س', 2)} × {formatNumber(String(quantity), { decimals: 0 })}</p></div><Button size="sm" variant="outline" aria-label={ar.addOne} onClick={() => addProduct(product)}>+1</Button></Card>)}<Card className="flex items-center justify-between p-4"><span className="font-bold text-slate-200">{ar.total}</span><span className="text-lg font-extrabold text-emerald-300">{formatCurrency(total.toFixed(2), store?.currency_symbol || 'ر.س', 2)}</span></Card></div>}
-    <BarcodeScanner isOpen={scannerOpen} storeId={store?.id || ''} onClose={() => setScannerOpen(false)} onCode={(code) => { void handleCode(code); }} onProduct={(product) => addProduct(product)} />
-  </div>;
+        <div className="flex items-center gap-2">
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(ar.clearCartConfirm)) {
+                  clearCart();
+                  showToast(ar.cartCleared, 'info');
+                }
+              }}
+              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition"
+              title={ar.clearCart}
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          )}
+
+          <Button
+            variant="primary"
+            onClick={() => setScannerOpen(true)}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-950/40"
+          >
+            <ScanLine className="w-4 h-4" />
+            <span>{ar.scanProduct}</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* البحث الحي السريع للإضافة المباشرة */}
+      <PosProductSearch
+        onSelectProduct={handleProductSelected}
+        currencySymbol={currencySymbol}
+        numberFormat={numberFormat}
+      />
+
+      {/* خيارات مطابقة الباركود المتعددة إن وجدت */}
+      {choices.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+          <p className="font-bold text-white text-sm">{ar.chooseProduct}</p>
+          <div className="space-y-1.5">
+            {choices.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  handleProductSelected(p);
+                  setChoices([]);
+                }}
+                className="w-full text-right p-3 bg-slate-800/80 hover:bg-slate-800 rounded-xl flex items-center justify-between transition"
+              >
+                <span className="font-bold text-white text-sm">{p.name}</span>
+                <span className="text-xs font-bold text-emerald-400">
+                  {formatCurrencyDisplay(p.price, currencySymbol, numberFormat)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* محتويات السلة أو الحالة الفارغة */}
+      {items.length === 0 ? (
+        <div className="py-8 bg-slate-900/40 border border-dashed border-slate-800 rounded-3xl">
+          <EmptyState
+            icon={<ShoppingBasket className="w-12 h-12 text-slate-500" />}
+            title={ar.cartEmpty}
+            description={ar.cartEmptyDesc}
+          />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* قائمة البنود */}
+          <div className="space-y-2.5">
+            {items.map((item) => (
+              <CartItemRow
+                key={item.product.id}
+                item={item}
+                currencySymbol={currencySymbol}
+                numberFormat={numberFormat}
+                onUpdateQuantity={(qty) => {
+                  const res = updateItemQuantity(item.product.id, qty);
+                  if (!res.success) {
+                    showToast(res.error || ar.stockInvalid, 'error');
+                  }
+                }}
+                onRemove={() => removeItem(item.product.id)}
+              />
+            ))}
+          </div>
+
+          {/* الخصم على الفاتورة */}
+          <DiscountSection currencySymbol={currencySymbol} numberFormat={numberFormat} />
+
+          {/* طريقة الدفع والعميل للآجل */}
+          <PaymentMethodSelector currencySymbol={currencySymbol} numberFormat={numberFormat} />
+        </div>
+      )}
+
+      {/* شريط الإجمالي وتأكيد البيع الثابت أسفل الشاشة عند وجود بنود */}
+      {items.length > 0 && (
+        <div className="fixed bottom-16 left-0 right-0 z-30 p-4 bg-slate-950/95 backdrop-blur-md border-t border-slate-800">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+            <div>
+              <span className="text-xs text-slate-400 block">{ar.total} النهائي</span>
+              <span className="text-2xl font-black text-emerald-400">
+                {formatCurrencyDisplay(totalAmount, currencySymbol, numberFormat)}
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              variant="primary"
+              disabled={isSubmitting || (paymentMethod === 'credit' && !selectedCustomer)}
+              onClick={handleConfirmSale}
+              className="flex-1 max-w-xs py-3.5 text-base font-black bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-2xl shadow-xl shadow-emerald-950/50 flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <span>{ar.completingSale}</span>
+              ) : (
+                <>
+                  <Check className="w-5 h-5" />
+                  <span>{ar.confirmSale}</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ماسح الباركود بالكاميرا */}
+      <BarcodeScanner
+        isOpen={scannerOpen}
+        storeId={store?.id || ''}
+        onClose={() => setScannerOpen(false)}
+        onCode={(code) => {
+          void handleBarcodeScanned(code);
+        }}
+        onProduct={(product) => handleProductSelected(product)}
+      />
+
+      {/* نافذة نجاح الفاتورة والمشاركة */}
+      <SaleSuccessModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        receipt={successReceipt}
+        numberFormat={numberFormat}
+      />
+    </div>
+  );
 }

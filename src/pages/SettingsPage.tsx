@@ -10,7 +10,7 @@ import {
   Store,
   Binary,
   KeyRound,
-  Users,
+  Users, Receipt,
   Download,
   LogOut,
   Smartphone,
@@ -199,6 +199,37 @@ export default function SettingsPage() {
               {formatCurrency(149.75, displayCurrencySymbol)}
             </span>
           </div>
+        </CardContent>
+      </Card>
+
+            {/* إدارة المبيعات والفواتير والعملاء */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <CardTitle>الفواتير والحسابات</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Button
+            variant="outline"
+            className="w-full justify-between"
+            onClick={() => navigate('/sales')}
+            icon={<Receipt className="w-4 h-4 text-emerald-400" />}
+          >
+            <span>{ar.invoicesTitle}</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full justify-between"
+            onClick={() => navigate('/customers')}
+            icon={<Users className="w-4 h-4 text-amber-400" />}
+          >
+            <span>{ar.customersTitle}</span>
+          </Button>
         </CardContent>
       </Card>
 

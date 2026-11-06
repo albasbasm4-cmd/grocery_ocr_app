@@ -280,3 +280,8 @@ export async function fetchProductMovements(productId: string): Promise<StockMov
 
   return (data || []) as StockMovement[];
 }
+
+export async function searchProducts(storeId: string, query: string): Promise<Product[]> {
+  const res = await fetchProducts(storeId, { searchQuery: query, pageSize: 20 });
+  return res.products;
+}

@@ -109,3 +109,29 @@ export interface CustomerPayment {
   created_by: string | null;
   created_at: string;
 }
+
+export interface CartItem {
+  product: Product;
+  quantity: string;
+}
+
+export type DiscountType = 'fixed' | 'percentage';
+
+export interface PrintableReceipt {
+  storeName: string;
+  currencySymbol: string;
+  saleId: string;
+  createdAt: string;
+  paymentMethod: PaymentMethod;
+  customerName?: string | null;
+  items: Array<{
+    name: string;
+    quantity: string;
+    unitPrice: string;
+    lineTotal: string;
+    unit?: string;
+  }>;
+  subtotal: string;
+  discountAmount: string;
+  totalAmount: string;
+}

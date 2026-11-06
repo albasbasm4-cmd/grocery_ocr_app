@@ -9,7 +9,7 @@ import Decimal from 'decimal.js';
 import { ErrorState } from '../components/ui/ErrorState';
 import {
   TrendingUp,
-  Receipt,
+  Receipt, Users,
   AlertTriangle,
   CalendarClock,
   ShoppingCart,
@@ -234,6 +234,26 @@ export default function DashboardPage() {
       <Card>
         <h3 className="text-sm font-bold text-slate-300 mb-3">{ar.quickActions}</h3>
         <div className="grid grid-cols-2 gap-2.5">
+          <Link
+            to="/sales"
+            className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700/60 transition active:scale-[0.98]"
+          >
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0">
+              <Receipt className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-bold leading-tight">{ar.navInvoices}</span>
+          </Link>
+
+          <Link
+            to="/customers"
+            className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700/60 transition active:scale-[0.98]"
+          >
+            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 shrink-0">
+              <Users className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-bold leading-tight">{ar.navCustomers}</span>
+          </Link>
+
           <Link
             to="/pos?scan=true"
             className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700/60 transition active:scale-[0.98]"
