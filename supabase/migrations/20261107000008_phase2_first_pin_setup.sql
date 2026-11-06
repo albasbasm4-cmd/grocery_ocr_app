@@ -13,3 +13,7 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.is_admin_pin_set(UUID) TO authenticated;
+
+-- Existing report views must respect the caller's RLS and column grants.
+ALTER VIEW public.view_low_stock SET (security_invoker = true);
+ALTER VIEW public.view_expiring_soon SET (security_invoker = true);

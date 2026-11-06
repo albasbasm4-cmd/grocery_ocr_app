@@ -27,7 +27,7 @@ export function PinGate({ open, onClose, onVerified }: { open: boolean; onClose:
     if (!result?.ok) { setError(result?.code === 'locked' ? ar.pinLocked : result?.code === 'invalid_pin' ? ar.pinWrong : result?.message ?? ar.genericError); return; }
     const expires = result.expires_at;
     if (!expires) { setError(ar.genericError); return; }
-    setPinExpiresAt(expires); setPin(''); onVerified?.(); onClose();
+    setPinExpiresAt(expires); setPin(''); onVerified?.();
   }
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4" role="dialog" aria-modal="true" aria-labelledby="pin-title">
     <form onSubmit={submit} className="w-full max-w-sm space-y-5 rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
