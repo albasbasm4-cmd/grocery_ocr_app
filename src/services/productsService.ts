@@ -1,0 +1,282 @@
+import Decimal from 'decimal.js';
+import { supabase } from '../lib/supabase';
+import { Product, ProductUnit, StockMovement } from '../types';
+import { normalizeArabic } from '../lib/arabic';
+
+export interface ProductInput {
+  name: string;
+  category_id: string | null;
+  barcode: string | null;
+  sku_small_text: string | null;
+  unit: ProductUnit;
+  price: string;
+  cost_price: string;
+  stock_quantity?: string;
+  min_stock?: string;
+  expiry_date?: string | null;
+}
+
+export interface ProductsFilterOptions {
+  categoryId?: string | null;
+  filterType?: 'all' | 'low_stock' | 'expiring_soon' | 'inactive';
+  searchQuery?: string;
+}
+
+export async function fetchProducts(
+  storeId: string,
+  options?: ProductsFilterOptions & { page?: number; pageSize?: number }
+): Promise<{ products: Product[]; hasMore: boolean }> {
+  const { data, error } = await supabase.rpc('get_products_page', {
+    p_store_id: storeId,
+    p_search: options?.searchQuery ?? '',
+    p_category_id: options?.categoryId || null,
+    p_filter: options?.filterType ?? 'all',
+    p_page: options?.page ?? 0,
+    p_page_size: options?.pageSize ?? 40,
+  });
+  if (error) throw new Error(error.message);
+  const rows = (data || []) as Array<Product & { has_more: boolean }>;
+  return { products: rows.map(({ has_more: _hasMore, ...product }) => product), hasMore: Boolean(rows[0]?.has_more) };
+}
+
+export async function checkBarcodeConflict(
+  storeId: string,
+  barcode: string,
+  excludeProductId?: string
+): Promise<Product | null> {
+  const cleanBarcode = barcode.trim();
+  if (!cleanBarcode) return null;
+
+  let query = supabase
+    .from('products')
+    .select('id, store_id, category_id, name, name_normalized, barcode, sku_small_text, unit, price, stock_quantity, min_stock, expiry_date, is_active, created_at, updated_at')
+    .eq('store_id', storeId)
+    .eq('barcode', cleanBarcode);
+
+  if (excludeProductId) {
+    query = query.neq('id', excludeProductId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data as Product) || null;
+}
+
+export async function createProduct(storeId: string, input: ProductInput): Promise<Product> {
+  const trimmedName = input.name.trim();
+  if (!trimmedName) {
+    throw new Error('اسم المنتج مطلوب');
+  }
+
+  const priceNum = new Decimal(input.price || '0');
+  if (!priceNum.isFinite() || priceNum.isNegative()) {
+    throw new Error('سعر البيع يجب أن يكون أكبر من أو يساوي صفر');
+  }
+
+  const costNum = new Decimal(input.cost_price || '0');
+  if (!costNum.isFinite() || costNum.isNegative()) {
+    throw new Error('سعر التكلفة يجب أن يكون أكبر من أو يساوي صفر');
+  }
+
+  // فحص تعارض الباركود
+  if (input.barcode && input.barcode.trim()) {
+    const conflict = await checkBarcodeConflict(storeId, input.barcode);
+    if (conflict) {
+      throw new Error(`الباركود مسجل مسبقاً للمنتج: "${conflict.name}"`);
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('products')
+    .insert({
+      store_id: storeId,
+      category_id: input.category_id || null,
+      name: trimmedName,
+      name_normalized: normalizeArabic(trimmedName),
+      barcode: input.barcode?.trim() || null,
+      sku_small_text: input.sku_small_text?.trim() || null,
+      unit: input.unit || 'piece',
+      price: input.price,
+      cost_price: input.cost_price,
+      stock_quantity: '0',
+      min_stock: input.min_stock || '5',
+      expiry_date: input.expiry_date || null,
+      is_active: true,
+    })
+    .select('id, store_id, category_id, name, name_normalized, barcode, sku_small_text, unit, price, stock_quantity, min_stock, expiry_date, is_active, created_at, updated_at')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('يوجد منتج آخر يحمل نفس الباركود في هذا المتجر.');
+    }
+    throw new Error(error.message);
+  }
+  if (input.stock_quantity && new Decimal(input.stock_quantity).greaterThan(0)) {
+    await adjustProductStockRpc(data.id, input.stock_quantity, 'رصيد افتتاحي عند إضافة المنتج');
+  }
+  return data as Product;
+}
+
+export async function updateProduct(
+  productId: string,
+  storeId: string,
+  input: Partial<ProductInput> & { is_active?: boolean }
+): Promise<Product> {
+  const updates: Record<string, unknown> = {};
+
+  if (input.name !== undefined) {
+    const trimmed = input.name.trim();
+    if (!trimmed) throw new Error('اسم المنتج مطلوب');
+    updates.name = trimmed;
+    updates.name_normalized = normalizeArabic(trimmed);
+  }
+
+  if (input.price !== undefined) {
+    const priceNum = new Decimal(input.price || '0');
+    if (!priceNum.isFinite() || priceNum.isNegative()) {
+      throw new Error('سعر البيع يجب أن يكون أكبر من أو يساوي صفر');
+    }
+    updates.price = input.price;
+  }
+
+  if (input.cost_price !== undefined) {
+    const costNum = new Decimal(input.cost_price || '0');
+    if (!costNum.isFinite() || costNum.isNegative()) {
+      throw new Error('سعر التكلفة يجب أن يكون أكبر من أو يساوي صفر');
+    }
+    updates.cost_price = input.cost_price;
+  }
+
+  if (input.barcode !== undefined) {
+    const barcodeTrimmed = input.barcode?.trim() || null;
+    if (barcodeTrimmed) {
+      const conflict = await checkBarcodeConflict(storeId, barcodeTrimmed, productId);
+      if (conflict) {
+        throw new Error(`الباركود مسجل مسبقاً للمنتج: "${conflict.name}"`);
+      }
+    }
+    updates.barcode = barcodeTrimmed;
+  }
+
+  if (input.sku_small_text !== undefined) {
+    updates.sku_small_text = input.sku_small_text?.trim() || null;
+  }
+
+  if (input.category_id !== undefined) {
+    updates.category_id = input.category_id || null;
+  }
+
+  if (input.unit !== undefined) {
+    updates.unit = input.unit;
+  }
+
+  if (input.min_stock !== undefined) {
+    updates.min_stock = input.min_stock;
+  }
+
+  if (input.expiry_date !== undefined) {
+    updates.expiry_date = input.expiry_date || null;
+  }
+
+  if (input.is_active !== undefined) {
+    updates.is_active = input.is_active;
+  }
+
+  const { data, error } = await supabase
+    .from('products')
+    .update(updates)
+    .eq('id', productId)
+    .select('id, store_id, category_id, name, name_normalized, barcode, sku_small_text, unit, price, stock_quantity, min_stock, expiry_date, is_active, created_at, updated_at')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('يوجد منتج آخر يحمل نفس الباركود في هذا المتجر.');
+    }
+    throw new Error(error.message);
+  }
+
+  return data as Product;
+}
+
+export async function setProductActive(productId: string, isActive: boolean): Promise<Product> {
+  const { data, error } = await supabase
+    .from('products')
+    .update({ is_active: isActive })
+    .eq('id', productId)
+    .select('id, store_id, category_id, name, name_normalized, barcode, sku_small_text, unit, price, stock_quantity, min_stock, expiry_date, is_active, created_at, updated_at')
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as Product;
+}
+
+export async function adjustProductStockRpc(
+  productId: string,
+  newQuantity: string | number,
+  reason: string
+): Promise<{ success: boolean; new_quantity: number }> {
+  const qty = new Decimal(String(newQuantity));
+  if (!qty.isFinite() || qty.isNegative()) {
+    throw new Error('كمية المخزون يجب أن تكون رقمية وغير سالبة');
+  }
+
+  const cleanReason = reason.trim();
+  if (!cleanReason) {
+    throw new Error('سبب تعديل المخزون مطلوب');
+  }
+
+  const { data, error } = await supabase.rpc('adjust_stock', {
+    p_product_id: productId,
+    p_new_quantity: qty.toFixed(3),
+    p_reason: cleanReason,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as { success: boolean; new_quantity: number };
+}
+
+export async function fetchProductCosts(storeId: string, productIds: string[]): Promise<Map<string, string>> {
+  if (!productIds.length) return new Map();
+  const { data, error } = await supabase.rpc('get_product_costs', { p_store_id: storeId, p_product_ids: productIds });
+  if (error) throw new Error(error.message);
+  return new Map(((data || []) as Array<{ product_id: string; cost_price: string | number }>).map((row) => [row.product_id, String(row.cost_price)]));
+}
+
+export async function fetchProductById(productId: string): Promise<Product> {
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, store_id, category_id, name, name_normalized, barcode, sku_small_text, unit, price, stock_quantity, min_stock, expiry_date, is_active, created_at, updated_at')
+    .eq('id', productId)
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data as Product;
+}
+
+export async function fetchProductMovements(productId: string): Promise<StockMovement[]> {
+  const { data, error } = await supabase
+    .from('stock_movements')
+    .select('*')
+    .eq('product_id', productId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data || []) as StockMovement[];
+}

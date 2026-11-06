@@ -14,6 +14,7 @@ interface AuthContextValue {
   refreshStore: () => Promise<void>;
   setPinExpiresAt: (value: string | null) => void;
   signOut: () => Promise<void>;
+  verifyPin: (pin: string) => Promise<{ success: boolean; error?: string }>;
 }
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -74,6 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null, session, store, role, pinExpiresAt, loading,
     refreshStore,
     setPinExpiresAt: (expires: string | null) => setPinExpiresAt(expires),
+    verifyPin: async (pin: string) => {
+      if (!store) return { success: false, error: 'المتجر غير موجود.' };
+      const { data, error } = await supabase.rpc('verify_admin_pin', { p_store_id: store.id, p_pin: pin });
+      if (error) return { success: false, error: error.message };
+      const result = data as { ok?: boolean; code?: string; message?: string; expires_at?: string } | null;
+      if (!result?.ok || !result.expires_at) return { success: false, error: result?.message || result?.code || 'رمز PIN غير صحيح.' };
+      setPinExpiresAt(result.expires_at);
+      return { success: true };
+    },
     signOut: async () => { await supabase.auth.signOut(); setPinExpiresAt(null); },
   }), [session, store, role, pinExpiresAt, loading, refreshStore]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

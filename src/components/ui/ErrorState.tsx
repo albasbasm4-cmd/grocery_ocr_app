@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
+import { ar } from '../../i18n/ar';
 
 export interface ErrorStateProps {
   title?: string;
@@ -9,7 +10,7 @@ export interface ErrorStateProps {
 }
 
 export const ErrorState: React.FC<ErrorStateProps> = ({
-  title = 'حدث خطأ',
+  title = ar.genericError,
   message,
   onRetry,
 }) => {
@@ -20,7 +21,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       <p className="text-xs text-rose-300/80 mt-1 mb-4">{message}</p>
       {onRetry && (
         <Button onClick={onRetry} variant="secondary" size="sm" icon={<RotateCcw className="w-4 h-4" />}>
-          إعادة المحاولة
+          {ar.retry}
         </Button>
       )}
     </div>

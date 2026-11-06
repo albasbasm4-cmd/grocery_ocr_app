@@ -18,6 +18,10 @@ import ComingSoonPage from './pages/ComingSoonPage';
 import { ar } from './i18n/ar';
 import { supabase } from './lib/supabase';
 import { useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import ProductsPage from './pages/ProductsPage';
+import CategoriesPage from './pages/CategoriesPage';
+import { usePermissions } from './hooks/usePermissions';
 
 function SetupRoute() {
   const { user, store, loading } = useAuth();
@@ -49,7 +53,8 @@ function AuthRoutes() { return <Routes>
   <Route element={<RequireAuth />}>
     <Route element={<AppLayout />}>
       <Route path="/" element={<DashboardPage />} />
-      <Route path="/products" element={<ComingSoonPage />} />
+      <Route path="/products" element={<ProductsPage />} />
+      <Route path="/categories" element={<OwnerCategoriesRoute />} />
       <Route path="/pos" element={<ComingSoonPage />} />
       <Route element={<PinProtected />}>
         <Route path="/staff" element={<StaffManagementPage />} />
@@ -61,11 +66,18 @@ function AuthRoutes() { return <Routes>
   </Route>
   <Route path="*" element={<Navigate to="/" replace />} />
 </Routes>; }
+function OwnerCategoriesRoute() {
+  const { isOwner } = usePermissions();
+  if (!isOwner) return <Navigate to="/unauthorized" replace />;
+  return <CategoriesPage />;
+}
 function OwnerOnlyRoute() {
   const { role } = useAuth();
   if (role !== 'owner') return <Navigate to="/unauthorized" replace />;
   return <ComingSoonPage />;
 }
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
+
 export default function App() {
-  return <ToastProvider><SettingsProvider><BrowserRouter><AuthProvider><AuthRoutes /></AuthProvider></BrowserRouter><ToastContainer /></SettingsProvider></ToastProvider>;
+  return <QueryClientProvider client={queryClient}><ToastProvider><SettingsProvider><BrowserRouter><AuthProvider><AuthRoutes /></AuthProvider></BrowserRouter><ToastContainer /></SettingsProvider></ToastProvider></QueryClientProvider>;
 }
