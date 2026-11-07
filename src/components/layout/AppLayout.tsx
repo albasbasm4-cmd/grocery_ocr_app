@@ -51,7 +51,7 @@ export const AppLayout: React.FC = () => {
                   {role === 'owner' ? ar.owner : ar.staff}
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  {store?.currency_symbol || 'ر.س'}
+                  {store?.currency_symbol || ar.defaultCurrencySymbol}
                 </span>
               </div>
             </div>

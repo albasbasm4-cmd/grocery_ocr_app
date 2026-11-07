@@ -4,6 +4,7 @@ import { Product, ProductUnit, StockMovement } from '../types';
 import { normalizeArabic } from '../lib/arabic';
 import { offlineDb } from '../lib/offlineDb';
 import { isOnline, assertOnline } from '../lib/offlineGuard';
+import { ar } from '../i18n/ar';
 
 export interface ProductInput {
   name: string;
@@ -118,28 +119,28 @@ export async function checkBarcodeConflict(
 }
 
 export async function createProduct(storeId: string, input: ProductInput): Promise<Product> {
-  assertOnline('إضافة منتج جديد');
+  assertOnline(ar.actionOnlineAddNewProduct);
 
   const trimmedName = input.name.trim();
   if (!trimmedName) {
-    throw new Error('اسم المنتج مطلوب');
+    throw new Error(ar.productNameRequired);
   }
 
   const priceNum = new Decimal(input.price || '0');
   if (!priceNum.isFinite() || priceNum.isNegative()) {
-    throw new Error('سعر البيع يجب أن يكون أكبر من أو يساوي صفر');
+    throw new Error(ar.priceMustBeNonNegative);
   }
 
   const costNum = new Decimal(input.cost_price || '0');
   if (!costNum.isFinite() || costNum.isNegative()) {
-    throw new Error('سعر التكلفة يجب أن يكون أكبر من أو يساوي صفر');
+    throw new Error(ar.costPriceMustBeNonNegative);
   }
 
   // فحص تعارض الباركود
   if (input.barcode && input.barcode.trim()) {
     const conflict = await checkBarcodeConflict(storeId, input.barcode);
     if (conflict) {
-      throw new Error(`الباركود مسجل مسبقاً للمنتج: "${conflict.name}"`);
+      throw new Error(ar.barcodeRegisteredTo(conflict.name));
     }
   }
 
@@ -165,12 +166,12 @@ export async function createProduct(storeId: string, input: ProductInput): Promi
 
   if (error) {
     if (error.code === '23505') {
-      throw new Error('يوجد منتج آخر يحمل نفس الباركود في هذا المتجر.');
+      throw new Error(ar.duplicateBarcodeError);
     }
     throw new Error(error.message);
   }
   if (input.stock_quantity && new Decimal(input.stock_quantity).greaterThan(0)) {
-    await adjustProductStockRpc(data.id, input.stock_quantity, 'رصيد افتتاحي عند إضافة المنتج');
+    await adjustProductStockRpc(data.id, input.stock_quantity, ar.initialStockNote);
   }
 
   // تحديث النسخة المحلية في Dexie
@@ -184,13 +185,13 @@ export async function updateProduct(
   storeId: string,
   input: Partial<ProductInput> & { is_active?: boolean }
 ): Promise<Product> {
-  assertOnline('تعديل بيانات المنتج وسعر البيع');
+  assertOnline(ar.actionOnlineEditProduct);
 
   const updates: Record<string, unknown> = {};
 
   if (input.name !== undefined) {
     const trimmed = input.name.trim();
-    if (!trimmed) throw new Error('اسم المنتج مطلوب');
+    if (!trimmed) throw new Error(ar.productNameRequired);
     updates.name = trimmed;
     updates.name_normalized = normalizeArabic(trimmed);
   }
@@ -198,7 +199,7 @@ export async function updateProduct(
   if (input.price !== undefined) {
     const priceNum = new Decimal(input.price || '0');
     if (!priceNum.isFinite() || priceNum.isNegative()) {
-      throw new Error('سعر البيع يجب أن يكون أكبر من أو يساوي صفر');
+      throw new Error(ar.priceMustBeNonNegative);
     }
     updates.price = input.price;
   }
@@ -206,7 +207,7 @@ export async function updateProduct(
   if (input.cost_price !== undefined) {
     const costNum = new Decimal(input.cost_price || '0');
     if (!costNum.isFinite() || costNum.isNegative()) {
-      throw new Error('سعر التكلفة يجب أن يكون أكبر من أو يساوي صفر');
+      throw new Error(ar.costPriceMustBeNonNegative);
     }
     updates.cost_price = input.cost_price;
   }
@@ -216,7 +217,7 @@ export async function updateProduct(
     if (barcodeTrimmed) {
       const conflict = await checkBarcodeConflict(storeId, barcodeTrimmed, productId);
       if (conflict) {
-        throw new Error(`الباركود مسجل مسبقاً للمنتج: "${conflict.name}"`);
+        throw new Error(ar.barcodeRegisteredTo(conflict.name));
       }
     }
     updates.barcode = barcodeTrimmed;
@@ -255,7 +256,7 @@ export async function updateProduct(
 
   if (error) {
     if (error.code === '23505') {
-      throw new Error('يوجد منتج آخر يحمل نفس الباركود في هذا المتجر.');
+      throw new Error(ar.duplicateBarcodeError);
     }
     throw new Error(error.message);
   }
@@ -267,7 +268,7 @@ export async function updateProduct(
 }
 
 export async function setProductActive(productId: string, isActive: boolean): Promise<Product> {
-  assertOnline('تعطيل أو تفعيل المنتج');
+  assertOnline(ar.actionOnlineToggleProduct);
 
   const { data, error } = await supabase
     .from('products')
@@ -290,16 +291,16 @@ export async function adjustProductStockRpc(
   newQuantity: string | number,
   reason: string
 ): Promise<{ success: boolean; new_quantity: number }> {
-  assertOnline('تسوية المخزون يدوياً');
+  assertOnline(ar.actionOnlineAdjustStock);
 
   const qty = new Decimal(String(newQuantity));
   if (!qty.isFinite() || qty.isNegative()) {
-    throw new Error('كمية المخزون يجب أن تكون رقمية وغير سالبة');
+    throw new Error(ar.stockMustBeNonNegative);
   }
 
   const cleanReason = reason.trim();
   if (!cleanReason) {
-    throw new Error('سبب تعديل المخزون مطلوب');
+    throw new Error(ar.adjustStockReason + ar.reasonRequiredSuffix);
   }
 
   const { data, error } = await supabase.rpc('adjust_stock', {

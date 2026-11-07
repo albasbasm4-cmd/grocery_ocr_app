@@ -30,7 +30,7 @@ export default function SalesPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  const currencySymbol = store?.currency_symbol || 'ر.س';
+  const currencySymbol = store?.currency_symbol || ar.defaultCurrencySymbol;
 
   const loadSales = useCallback(async () => {
     if (!store) return;
@@ -45,7 +45,7 @@ export default function SalesPage() {
       });
       setSales(data);
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'تعذر تحميل الفواتير.', 'error');
+      showToast(err instanceof Error ? err.message : ar.loadInvoicesError, 'error');
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export default function SalesPage() {
         setIsDetailsOpen(true);
       }
     } catch (err) {
-      showToast('تعذر جلب تفاصيل الفاتورة.', 'error');
+      showToast(ar.loadInvoiceDetailsError, 'error');
     } finally {
       setLoadingDetails(false);
     }
@@ -84,7 +84,7 @@ export default function SalesPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-extrabold text-white">{ar.invoicesTitle}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">سجل كامل لعمليات البيع والإرجاع والإلغاء</p>
+          <p className="text-xs text-slate-400 mt-0.5">{ar.salesSubtitle}</p>
         </div>
 
         <button
@@ -92,7 +92,7 @@ export default function SalesPage() {
           onClick={() => void loadSales()}
           disabled={loading}
           className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition"
-          title="تحديث"
+          title={ar.refresh}
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
@@ -107,7 +107,7 @@ export default function SalesPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ابحث برقم الفاتورة أو اسم العميل…"
+            placeholder={ar.searchInvoicePlaceholder}
             className="w-full bg-transparent text-white outline-none text-right"
           />
         </div>
@@ -143,7 +143,7 @@ export default function SalesPage() {
             onChange={(e) => setPaymentMethod(e.target.value as any)}
             className="bg-slate-950 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 outline-none focus:border-emerald-500 text-right"
           >
-            <option value="all">كل طرق الدفع</option>
+            <option value="all">{ar.allPaymentMethodsOption}</option>
             <option value="cash">{ar.paymentCash}</option>
             <option value="credit">{ar.paymentCredit}</option>
           </select>
@@ -153,7 +153,7 @@ export default function SalesPage() {
             onChange={(e) => setStatus(e.target.value as any)}
             className="bg-slate-950 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 outline-none focus:border-emerald-500 text-right"
           >
-            <option value="all">كل الحالات</option>
+            <option value="all">{ar.allStatusesOption}</option>
             <option value="completed">{ar.statusCompleted}</option>
             <option value="voided">{ar.statusVoided}</option>
           </select>
@@ -170,7 +170,7 @@ export default function SalesPage() {
           <EmptyState
             icon={<Receipt className="w-10 h-10 text-slate-500" />}
             title={ar.noSalesFound}
-            description="لم يتم تسجيل فواتير وفق معايير التصفية الحالية."
+            description={ar.noInvoicesFilterDescription}
           />
         </div>
       ) : (

@@ -5,9 +5,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { toLatinDigits } from '../lib/numbers';
 
 function pinError(message: string): string {
-  if (message.includes('قفل') || message.toLowerCase().includes('locked')) return ar.pinLocked;
-  if (message.includes('غير صحيح') || message.toLowerCase().includes('incorrect')) return ar.pinWrong;
-  if (message.includes('لم يتم تعيين')) return ar.pinMissing;
+  if (message.includes(ar.pinLocked) || message.toLowerCase().includes('locked')) return ar.pinLocked;
+  if (message.includes(ar.pinWrong) || message.toLowerCase().includes('incorrect')) return ar.pinWrong;
+  if (message.includes(ar.pinMissing)) return ar.pinMissing;
   return message || ar.genericError;
 }
 export function PinGate({ open, onClose, onVerified }: { open: boolean; onClose: () => void; onVerified?: () => void }) {

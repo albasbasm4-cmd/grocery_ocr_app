@@ -21,7 +21,7 @@ export function StockAdjustmentModal({ product, isOpen, onClose, onSubmit, isSav
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
-    if (!reason.trim()) { setError(ar.adjustStockReason + ' مطلوب'); return; }
+    if (!reason.trim()) { setError(ar.adjustStockReason + ar.reasonRequiredSuffix); return; }
     if (!/^\d+(\.\d{1,3})?$/.test(quantity) || !new Decimal(quantity).isFinite() || new Decimal(quantity).isNegative()) { setError(ar.stockInvalid); return; }
     try {
       await onSubmit(quantity, reason.trim());
@@ -34,7 +34,7 @@ export function StockAdjustmentModal({ product, isOpen, onClose, onSubmit, isSav
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={ar.adjustStock}>
       <form className="space-y-4" onSubmit={submit}>
-        <p className="text-sm text-slate-400">{product?.name} · {ar.stockQuantity}: {product?.stock_quantity}</p>
+        <p className="text-sm text-slate-400">{ar.productStockSummary(product?.name || "", ar.stockQuantity, product?.stock_quantity ?? 0)}</p>
         <NumberInput label={ar.newStockQuantity} value={quantity} onChange={setQuantity} allowDecimals />
         <label className="block text-sm font-semibold text-slate-300">{ar.adjustStockReason}
           <textarea className="field mt-2 min-h-[90px]" value={reason} onChange={(e) => setReason(e.target.value)} />

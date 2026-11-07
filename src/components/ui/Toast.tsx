@@ -1,6 +1,7 @@
 import React from 'react';
 import { useToast, ToastType } from '../../contexts/ToastContext';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { ar } from '../../i18n/ar';
 
 const icons: Record<ToastType, React.ReactNode> = {
   success: <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />,
@@ -40,7 +41,7 @@ export const ToastContainer: React.FC = () => {
           <button
             onClick={() => dismissToast(toast.id)}
             className="text-slate-400 hover:text-white p-1 rounded-lg transition"
-            aria-label="إغلاق الإشعار"
+            aria-label={ar.closeNotification}
           >
             <X className="w-4 h-4" />
           </button>

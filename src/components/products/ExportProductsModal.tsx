@@ -53,7 +53,7 @@ export function ExportProductsModal({
         setSuccess(false);
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'فشل تصدير المنتجات.');
+      setError(err instanceof Error ? err.message : ar.exportProductsError);
     } finally {
       setLoading(false);
     }
@@ -94,14 +94,14 @@ export function ExportProductsModal({
           {scope === 'category' && (
             <div className="pt-2">
               <label className="block text-xs font-bold text-slate-300 mb-1">
-                اختر التصنيف:
+                {ar.selectCategoryLabel}
               </label>
               <select
                 className="field text-xs py-2"
                 value={selectedCategoryId}
                 onChange={(e) => setSelectedCategoryId(e.target.value)}
               >
-                <option value="">-- كافة التصنيفات --</option>
+                <option value="">{ar.allCategoriesOption}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -130,7 +130,7 @@ export function ExportProductsModal({
               </div>
               <div>
                 <p className="text-xs font-bold">{ar.formatExcel}</p>
-                <p className="text-[10px] text-slate-500">جداول بيانات Excel</p>
+                <p className="text-[10px] text-slate-500">{ar.excelSheetsDesc}</p>
               </div>
             </button>
 
@@ -148,7 +148,7 @@ export function ExportProductsModal({
               </div>
               <div>
                 <p className="text-xs font-bold">{ar.formatCsv}</p>
-                <p className="text-[10px] text-slate-500">ترميز عربي UTF-8</p>
+                <p className="text-[10px] text-slate-500">{ar.utf8ArabicDesc}</p>
               </div>
             </button>
           </div>

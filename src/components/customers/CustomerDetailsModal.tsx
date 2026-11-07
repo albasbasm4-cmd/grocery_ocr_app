@@ -49,7 +49,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose} title={`سجل العميل: ${customer.name}`} maxWidth="lg">
+      <Modal isOpen={isOpen} onClose={onClose} title={ar.customerHistoryModalTitle(customer.name)} maxWidth="lg">
         <div className="space-y-4 text-xs">
           {/* معلومات العميل والرصيد */}
           <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -114,7 +114,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
 
           {/* محتوى السجل */}
           {loadingHistory ? (
-            <p className="text-center text-slate-400 py-6">جارٍ تحميل السجل…</p>
+            <p className="text-center text-slate-400 py-6">{ar.loadingCustomerHistory}</p>
           ) : activeTab === 'sales' ? (
             sales.length === 0 ? (
               <p className="text-center text-slate-500 py-6">{ar.noCreditSales}</p>
@@ -154,7 +154,7 @@ export const CustomerDetailsModal: React.FC<CustomerDetailsModalProps> = ({
               {payments.map((p) => (
                 <div key={p.id} className="pt-2 pb-1 flex items-center justify-between text-xs">
                   <div>
-                    <span className="font-bold text-emerald-400 block">دفعة نقدية مسددة</span>
+                    <span className="font-bold text-emerald-400 block">{ar.paidCashInstallment}</span>
                     <span className="text-[10px] text-slate-400">
                       {new Date(p.created_at).toLocaleString('ar-SA')}
                     </span>

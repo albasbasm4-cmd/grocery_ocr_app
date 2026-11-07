@@ -75,7 +75,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'فشل تسجيل الدفعة.');
+      setError(err instanceof Error ? err.message : ar.recordPaymentError);
     } finally {
       setLoading(false);
     }
@@ -87,11 +87,11 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         {/* ملخص دين العميل */}
         <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-1.5 text-xs">
           <div className="flex justify-between text-slate-400">
-            <span>العميل:</span>
+            <span>{ar.customerLabel}</span>
             <span className="font-bold text-white">{customer.name}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
-            <span className="text-slate-400">إجمالي الدين الحالي:</span>
+            <span className="text-slate-400">{ar.currentTotalDebt}</span>
             <span className="font-extrabold text-rose-400 text-base">
               {formatCurrencyDisplay(customer.balance, currencySymbol, numberFormat)}
             </span>
@@ -115,7 +115,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 onClick={handleQuickFillAll}
                 className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 transition"
               >
-                سداد كامل الدين
+                {ar.payFullDebt}
               </button>
             )}
           </div>

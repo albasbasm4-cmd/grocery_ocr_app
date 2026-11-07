@@ -1,3 +1,4 @@
+import { ar } from '../i18n/ar';
 /**
  * أداة التحقق من اتصال الإنترنت لحماية العمليات الحساسة (المرحلة 10)
  * تمنع العمليات الإدارية الحساسة أثناء انقطاع الإنترنت لحماية اتساق البيانات
@@ -13,7 +14,7 @@ export function isOnline(): boolean {
 export function assertOnline(actionTitle: string): void {
   if (!isOnline()) {
     throw new Error(
-      `عملية "${actionTitle}" تتطلب اتصالاً فعالاً بالإنترنت ولا يمكن إجراؤها في وضع عدم الاتصال.`
+      ar.onlineRequiredForAction(actionTitle)
     );
   }
 }
@@ -24,7 +25,7 @@ export function ensureOnlineWithToast(
 ): boolean {
   if (!isOnline()) {
     showToast(
-      `عملية "${actionTitle}" تتطلب اتصالاً فعالاً بالإنترنت ولا يمكن إجراؤها دون اتصال.`,
+      ar.onlineRequiredForAction(actionTitle),
       'error'
     );
     return false;

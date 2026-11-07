@@ -1,3 +1,4 @@
+import { ar } from '../i18n/ar';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import Decimal from 'decimal.js';
 import { useAuth } from './AuthContext';
@@ -98,17 +99,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addItem = (product: Product, quantityToAdd = '1') => {
     if (!product.is_active) {
-      return { success: false, error: `المنتج "${product.name}" معطّل حالياً ولا يمكن بيعه.` };
+      return { success: false, error: ar.cartProductInactive(product.name) };
     }
 
     const availableStock = new Decimal(product.stock_quantity || '0');
     if (availableStock.lessThanOrEqualTo(0)) {
-      return { success: false, error: `المنتج "${product.name}" نفد من المخزون تماماً.` };
+      return { success: false, error: ar.cartProductOutOfStock(product.name) };
     }
 
     const addDec = new Decimal(quantityToAdd || '1');
     if (!addDec.isFinite() || addDec.lessThanOrEqualTo(0)) {
-      return { success: false, error: 'الكمية المضافة غير صالحة.' };
+      return { success: false, error: ar.invalidQuantityAdded };
     }
 
     const existingIndex = items.findIndex((i) => i.product.id === product.id);
@@ -122,7 +123,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (targetQty.greaterThan(availableStock)) {
       return {
         success: false,
-        error: `الكمية المطلوبة (${targetQty}) تتجاوز المخزون المتوفر (${availableStock}) للمنتج "${product.name}".`,
+        error: ar.cartStockExceeded(targetQty, availableStock, product.name),
       };
     }
 
@@ -143,7 +144,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateItemQuantity = (productId: string, quantityStr: string) => {
     const item = items.find((i) => i.product.id === productId);
-    if (!item) return { success: false, error: 'المنتج غير موجود في السلة.' };
+    if (!item) return { success: false, error: ar.productNotInCart };
 
     const trimmed = quantityStr.trim();
     if (trimmed === '' || trimmed === '0') {
@@ -155,18 +156,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       qtyDec = new Decimal(trimmed);
     } catch {
-      return { success: false, error: 'الكمية المدخلة غير صحيحة.' };
+      return { success: false, error: ar.invalidQuantityEntered };
     }
 
     if (!qtyDec.isFinite() || qtyDec.lessThan(0)) {
-      return { success: false, error: 'الكمية يجب أن تكون أكبر من الصفر.' };
+      return { success: false, error: ar.quantityMustBePositive };
     }
 
     const availableStock = new Decimal(item.product.stock_quantity || '0');
     if (qtyDec.greaterThan(availableStock)) {
       return {
         success: false,
-        error: `الكمية المطلوبة (${qtyDec}) تتجاوز المخزون المتوفر (${availableStock}) للمنتج "${item.product.name}".`,
+        error: ar.cartStockExceeded(qtyDec, availableStock, item.product.name),
       };
     }
 

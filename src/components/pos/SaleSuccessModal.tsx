@@ -45,38 +45,38 @@ export const SaleSuccessModal: React.FC<SaleSuccessModalProps> = ({
         <div>
           <h3 className="text-lg font-bold text-white">{ar.saleSuccessDesc}</h3>
           <p className="text-xs text-slate-400 mt-1">
-            رقم الفاتورة: #{receipt.saleId.slice(0, 8).toUpperCase()}
+            {ar.invoiceNumberPrefix(receipt.saleId.slice(0, 8).toUpperCase())}
           </p>
         </div>
 
         {/* ملخص المبالغ والبنود */}
         <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-right space-y-2 text-xs">
           <div className="flex justify-between text-slate-400">
-            <span>عدد البنود:</span>
-            <span className="font-bold text-slate-200">{receipt.items.length} منتج</span>
+            <span>{ar.itemsNumberCount}</span>
+            <span className="font-bold text-slate-200">{ar.itemsCount(receipt.items.length)}</span>
           </div>
           <div className="flex justify-between text-slate-400">
-            <span>طريقة الدفع:</span>
+            <span>{ar.paymentMethod}:</span>
             <span className="font-bold text-slate-200">
               {receipt.paymentMethod === 'cash' ? ar.paymentCash : ar.paymentCredit}
             </span>
           </div>
           {receipt.customerName && (
             <div className="flex justify-between text-slate-400">
-              <span>العميل:</span>
+              <span>{ar.customerLabel}</span>
               <span className="font-bold text-amber-300">{receipt.customerName}</span>
             </div>
           )}
           {Number(receipt.discountAmount) > 0 && (
             <div className="flex justify-between text-rose-400">
-              <span>الخصم:</span>
+              <span>{ar.discount}:</span>
               <span className="font-bold">
                 -{formatCurrencyDisplay(receipt.discountAmount, receipt.currencySymbol, numberFormat)}
               </span>
             </div>
           )}
           <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-sm">
-            <span className="font-bold text-slate-300">الإجمالي المستلم:</span>
+            <span className="font-bold text-slate-300">{ar.totalReceived}</span>
             <span className="font-extrabold text-emerald-400 text-lg">
               {formatCurrencyDisplay(receipt.totalAmount, receipt.currencySymbol, numberFormat)}
             </span>
@@ -93,7 +93,7 @@ export const SaleSuccessModal: React.FC<SaleSuccessModalProps> = ({
             className="w-full flex items-center justify-center gap-2 py-3"
           >
             {sharing ? (
-              <span>جارٍ المعالجة…</span>
+              <span>{ar.processing}</span>
             ) : (
               <>
                 <Share2 className="w-4 h-4" />

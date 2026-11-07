@@ -38,7 +38,7 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'فشل إلغاء الفاتورة.');
+      setError(err instanceof Error ? err.message : ar.voidFailedError);
     } finally {
       setIsSubmitting(false);
     }
@@ -72,7 +72,7 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({
             <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
             <div>
               <p className="font-bold">{ar.voidSaleConfirm}</p>
-              <p className="mt-1 text-slate-400">رقم الفاتورة: #{sale.id.slice(0, 8)}</p>
+              <p className="mt-1 text-slate-400">{ar.voidInvoiceNumber(sale.id.slice(0, 8))}</p>
             </div>
           </div>
 
@@ -94,7 +94,7 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({
                 setReason(e.target.value);
                 setError(null);
               }}
-              placeholder="مثال: خطأ في إدخال الأصناف / طلب الزبون إلغاء العملية"
+              placeholder={ar.voidReasonPlaceholder}
               className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white text-xs outline-none focus:border-rose-500 text-right"
             />
           </div>
@@ -119,8 +119,8 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({
         isOpen={isPinModalOpen}
         onClose={() => setIsPinModalOpen(false)}
         onSuccess={() => void performVoid()}
-        title="تأكيد رمز PIN لإلغاء الفاتورة"
-        description="هذا الإجراء حساس ويعيد المخزون، أدخل رمز PIN للمتابعة."
+        title={ar.voidPinModalTitle}
+        description={ar.voidPinModalDesc}
       />
     </>
   );

@@ -8,6 +8,7 @@ import {
   subscribeToSyncChanges,
 } from '../../services/offlineSyncService';
 import { NeedsReviewModal } from '../pos/NeedsReviewModal';
+import { ar } from '../../i18n/ar';
 
 export const OfflineBanner: React.FC = () => {
   const { store } = useAuth();
@@ -90,12 +91,12 @@ export const OfflineBanner: React.FC = () => {
 
   // تنسيق وقت آخر مزامنة
   const formatLastSync = (isoString: string | null) => {
-    if (!isoString) return 'لم تتم بعد';
+    if (!isoString) return ar.neverSynced;
     try {
       const date = new Date(isoString);
       return date.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
     } catch {
-      return 'غير متوفر';
+      return ar.notAvailable;
     }
   };
 
@@ -119,14 +120,14 @@ export const OfflineBanner: React.FC = () => {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <Wifi className="w-3.5 h-3.5 inline" /> متصل
+                  <Wifi className="w-3.5 h-3.5 inline" /> {ar.connected}
                 </span>
               </>
             ) : (
               <>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                 <span className="text-amber-400 font-bold flex items-center gap-1">
-                  <WifiOff className="w-3.5 h-3.5 inline" /> غير متصل
+                  <WifiOff className="w-3.5 h-3.5 inline" /> {ar.disconnected}
                 </span>
               </>
             )}
@@ -135,13 +136,13 @@ export const OfflineBanner: React.FC = () => {
           <span className="text-slate-500">|</span>
 
           <span className="text-[11px] text-slate-400">
-            آخر مزامنة: {formatLastSync(stats.lastSuccessfulSync)}
+            {ar.lastSync(formatLastSync(stats.lastSuccessfulSync))}
           </span>
 
           {/* عدّاد الفواتير بانتظار المزامنة */}
           {(stats.pendingCount > 0 || stats.syncingCount > 0) && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
-              ⏳ {stats.pendingCount + stats.syncingCount} بانتظار المزامنة
+              {ar.pendingSyncCount(stats.pendingCount + stats.syncingCount)}
             </span>
           )}
 
@@ -152,7 +153,7 @@ export const OfflineBanner: React.FC = () => {
               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-destructive/20 text-destructive-foreground border border-destructive/40 hover:bg-destructive/30 transition-all cursor-pointer"
             >
               <AlertTriangle className="w-3 h-3 text-red-400 inline" />
-              <span>{stats.needsReviewCount} تحتاج مراجعة</span>
+              <span>{ar.needsReviewBadge(stats.needsReviewCount)}</span>
             </button>
           )}
         </div>
@@ -167,10 +168,10 @@ export const OfflineBanner: React.FC = () => {
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
                 : 'bg-slate-800 text-slate-500 cursor-not-allowed'
             }`}
-            title="مزامنة المنتجات وطابور المبيعات الآن"
+            title={ar.syncTooltip}
           >
             <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'جاري المزامنة...' : 'مزامنة الآن'}</span>
+            <span>{isSyncing ? ar.syncingNow : ar.syncNow}</span>
           </button>
         </div>
       </div>
@@ -184,7 +185,7 @@ export const OfflineBanner: React.FC = () => {
             void refreshStats();
           }}
           storeId={store.id}
-          currencySymbol={store.currency_symbol || 'ر.س'}
+          currencySymbol={store.currency_symbol || ar.defaultCurrencySymbol}
         />
       )}
     </>

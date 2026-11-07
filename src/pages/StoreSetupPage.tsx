@@ -6,7 +6,7 @@ import { ar } from '../i18n/ar';
 export default function StoreSetupPage({ initialStep = 'store' }: { initialStep?: 'store' | 'pin' }) {
   const { refreshStore } = useAuth();
   const [step, setStep] = useState<'store' | 'pin'>(initialStep);
-  const [name, setName] = useState(''); const [currency, setCurrency] = useState('SAR'); const [symbol, setSymbol] = useState('ر.س');
+  const [name, setName] = useState(''); const [currency, setCurrency] = useState('SAR'); const [symbol, setSymbol] = useState(ar.defaultCurrencySymbol);
   const [pin, setPin] = useState(''); const [confirm, setConfirm] = useState('');
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   async function createStore(event: FormEvent<HTMLFormElement>) {

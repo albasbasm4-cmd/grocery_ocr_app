@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { supabase } from '../lib/supabase';
 import type { Customer, PaymentMethod, Sale, SaleItem, SaleStatus } from '../types';
 import { assertOnline } from '../lib/offlineGuard';
+import { ar } from '../i18n/ar';
 
 export interface ProcessSaleItemPayload {
   product_id: string;
@@ -39,15 +40,15 @@ export interface SalesFilterOptions {
 export async function processSale(input: ProcessSaleInput): Promise<ProcessSaleResult> {
   const discountDec = new Decimal(input.discountAmount || '0');
   if (!discountDec.isFinite() || discountDec.isNegative()) {
-    throw new Error('مبلغ الخصم غير صالح.');
+    throw new Error(ar.invalidDiscountError);
   }
 
   if (!input.items || input.items.length === 0) {
-    throw new Error('سلة البيع فارغة.');
+    throw new Error(ar.cartEmptyError);
   }
 
   if (input.paymentMethod === 'credit' && !input.customerId) {
-    throw new Error('يجب تحديد العميل في عمليات الدفع الآجل.');
+    throw new Error(ar.customerRequiredCreditError);
   }
 
   const { data, error } = await supabase.rpc('process_sale', {
@@ -157,10 +158,10 @@ export async function fetchSaleDetails(saleId: string, isOwner = false): Promise
 }
 
 export async function voidSale(saleId: string, reason: string): Promise<void> {
-  assertOnline('إلغاء الفاتورة');
+  assertOnline(ar.voidSale);
 
   const cleanReason = reason.trim();
-  if (!cleanReason) throw new Error('يرجى كتابة سبب الإلغاء.');
+  if (!cleanReason) throw new Error(ar.voidReasonRequired);
 
   const { error } = await supabase.rpc('void_sale', {
     p_sale_id: saleId,
@@ -180,13 +181,13 @@ export async function returnItems(
   items: ReturnItemPayload[],
   reason: string
 ): Promise<{ totalRefundAmount: number }> {
-  assertOnline('إرجاع أصناف من الفاتورة');
+  assertOnline(ar.returnItems);
 
   const cleanReason = reason.trim();
-  if (!cleanReason) throw new Error('يرجى كتابة سبب الإرجاع.');
+  if (!cleanReason) throw new Error(ar.returnReasonRequired);
 
   if (!items || items.length === 0) {
-    throw new Error('يرجى تحديد العناصر المراد إرجاعها.');
+    throw new Error(ar.returnItemsSelectError);
   }
 
   const { data, error } = await supabase.rpc('return_items', {

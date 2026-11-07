@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { offlineDb, type OutboxSale } from '../../lib/offlineDb';
 import { retryNeedsReviewSale, dismissNeedsReviewSale } from '../../services/offlineSyncService';
 import { Button } from '../ui/Button';
+import { ar } from '../../i18n/ar';
 
 interface NeedsReviewModalProps {
   isOpen: boolean;
@@ -50,12 +51,12 @@ export function NeedsReviewModal({ isOpen, onClose, storeId, currencySymbol }: N
   };
 
   const handleDismiss = async (clientUuid: string) => {
-    if (!window.confirm('هل أنت متأكد من استبعاد هذه الفاتورة المتعادضة؟ لن يتم إرسالها إلى الخادم.')) {
+    if (!window.confirm(ar.dismissConflictConfirm)) {
       return;
     }
     setActionInProgress(clientUuid);
     try {
-      await dismissNeedsReviewSale(clientUuid, 'تم الاستبعاد يدوياً بواسطة المالك');
+      await dismissNeedsReviewSale(clientUuid, ar.dismissedByOwnerNote);
       await loadSales();
     } finally {
       setActionInProgress(null);
@@ -69,12 +70,12 @@ export function NeedsReviewModal({ isOpen, onClose, storeId, currencySymbol }: N
         <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-amber-500/10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl font-bold">
-              ⚠️
+              
             </div>
             <div>
-              <h2 className="text-lg font-bold text-foreground">فواتير تحتاج مراجعة يدوية (تعارض مخزون)</h2>
+              <h2 className="text-lg font-bold text-foreground">{ar.needsReviewTitle}</h2>
               <p className="text-xs text-muted-foreground">
-                هذه العمليات تمت دون اتصال ورُفضت لاحقاً من الخادم بسبب نفاد كمية المخزون (بيع من جهاز آخر).
+                {ar.needsReviewDescription}
               </p>
             </div>
           </div>
@@ -89,12 +90,12 @@ export function NeedsReviewModal({ isOpen, onClose, storeId, currencySymbol }: N
         {/* Content list */}
         <div className="p-4 overflow-y-auto space-y-4 flex-1">
           {loading ? (
-            <div className="py-12 text-center text-muted-foreground">جاري تحميل الفواتير...</div>
+            <div className="py-12 text-center text-muted-foreground">{ar.loadingInvoices}</div>
           ) : sales.length === 0 ? (
             <div className="py-12 text-center space-y-2">
               <span className="text-4xl">🎉</span>
-              <p className="text-base font-semibold text-foreground">لا توجد أي فواتير متعارضة تحتاج مراجعة!</p>
-              <p className="text-xs text-muted-foreground">جميع الفواتير تمت مزامنتها بنجاح مع الخادم.</p>
+              <p className="text-base font-semibold text-foreground">{ar.noConflictingInvoices}</p>
+              <p className="text-xs text-muted-foreground">{ar.allInvoicesSyncedSuccess}</p>
             </div>
           ) : (
             sales.map((sale) => (
@@ -113,41 +114,41 @@ export function NeedsReviewModal({ isOpen, onClose, storeId, currencySymbol }: N
                       </span>
                       {sale.customer_name && (
                         <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
-                          العميل: {sale.customer_name}
+                          {ar.customerNamePrefix(sale.customer_name || "")}
                         </span>
                       )}
                     </div>
                     <div className="mt-1 text-sm font-bold text-foreground">
-                      المبلغ الإجمالي: {sale.total_amount} {currencySymbol}
+                      {ar.totalAmountPrefix(sale.total_amount, currencySymbol)}
                       <span className="text-xs font-normal text-muted-foreground mr-2">
-                        ({sale.payment_method === 'cash' ? 'نقدي' : 'آجل'})
+                        ({sale.payment_method === 'cash' ? ar.cashShort : ar.creditShort})
                       </span>
                     </div>
                   </div>
 
                   <div className="text-right">
                     <span className="inline-block px-2.5 py-1 text-xs font-bold rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                      تعارض مخزون
+                      {ar.stockConflict}
                     </span>
                   </div>
                 </div>
 
                 {/* Error details */}
                 <div className="text-xs p-2.5 rounded bg-background border border-border text-destructive space-y-1">
-                  <div className="font-semibold">سبب الرفض:</div>
+                  <div className="font-semibold">{ar.rejectionReason}</div>
                   <div className="text-muted-foreground leading-relaxed">
-                    {sale.error_details || sale.last_error || 'كمية غير كافية على الخادم.'}
+                    {sale.error_details || sale.last_error || ar.insufficientStockOnServer}
                   </div>
                 </div>
 
                 {/* Items */}
                 <div className="text-xs space-y-1 bg-muted/30 p-2 rounded border border-border/50">
-                  <div className="font-semibold text-muted-foreground">أصناف الفاتورة:</div>
+                  <div className="font-semibold text-muted-foreground">{ar.invoiceItemsLabel}</div>
                   <ul className="list-disc list-inside space-y-0.5 text-foreground">
                     {sale.items.map((it, idx) => (
                       <li key={idx}>
-                        {it.product_name_snapshot || it.product_id} × {it.quantity}
-                        {it.unit_price_snapshot && ` (سعر الوحدة: ${it.unit_price_snapshot} ${currencySymbol})`}
+                        {it.product_name_snapshot || it.product_id} x {it.quantity}
+                        {it.unit_price_snapshot && ` (${ar.unitPriceLabel}: ${it.unit_price_snapshot} ${currencySymbol})`}
                       </li>
                     ))}
                   </ul>
@@ -162,7 +163,7 @@ export function NeedsReviewModal({ isOpen, onClose, storeId, currencySymbol }: N
                     onClick={() => handleDismiss(sale.client_uuid)}
                     className="text-xs text-destructive hover:bg-destructive/10"
                   >
-                    استبعاد الفاتورة
+                    {ar.dismissInvoiceBtn}
                   </Button>
                   <Button
                     variant="primary"
@@ -171,7 +172,7 @@ export function NeedsReviewModal({ isOpen, onClose, storeId, currencySymbol }: N
                     onClick={() => handleRetry(sale.client_uuid)}
                     className="text-xs bg-amber-600 hover:bg-amber-700 text-white"
                   >
-                    {actionInProgress === sale.client_uuid ? 'جاري الإرسال...' : 'إعادة المحاولة الآن'}
+                    {actionInProgress === sale.client_uuid ? ar.sendingInProgress : ar.retryNowBtn}
                   </Button>
                 </div>
               </div>
@@ -182,7 +183,7 @@ export function NeedsReviewModal({ isOpen, onClose, storeId, currencySymbol }: N
         {/* Footer */}
         <div className="p-4 border-t border-border bg-muted/20 flex justify-end">
           <Button variant="outline" size="sm" onClick={onClose}>
-            إغلاق
+            {ar.close}
           </Button>
         </div>
       </div>

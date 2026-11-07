@@ -100,7 +100,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
                   <p className="text-[11px] text-slate-400">{selectedCustomer.phone}</p>
                 )}
                 <p className="text-[11px] text-slate-400 mt-1">
-                  الرصيد المستحق سابقاً:{' '}
+                  {ar.previousBalanceDue}{' '}
                   <span className="font-bold text-rose-400">
                     {formatCurrencyDisplay(selectedCustomer.balance, currencySymbol, numberFormat)}
                   </span>
@@ -112,7 +112,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
                 onClick={() => setIsPickerOpen(true)}
                 className="text-xs text-amber-400 hover:text-amber-300 underline font-medium px-2 py-1"
               >
-                تغيير
+                {ar.change}
               </button>
             </div>
           ) : (
@@ -136,7 +136,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
                     type="text"
                     value={customerSearch}
                     onChange={(e) => setCustomerSearch(e.target.value)}
-                    placeholder="ابحث باسم العميل أو هاتفه…"
+                    placeholder={ar.searchCustomerPlaceholderPos}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg pr-8 pl-3 py-1.5 text-xs text-white outline-none focus:border-emerald-500 text-right"
                   />
                 </div>
@@ -147,15 +147,15 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
                   className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  <span>عميل جديد</span>
+                  <span>{ar.newCustomer}</span>
                 </button>
               </div>
 
               {loadingCustomers ? (
-                <p className="text-center text-xs text-slate-400 py-2">جارٍ التحميل…</p>
+                <p className="text-center text-xs text-slate-400 py-2">{ar.loadingGeneric}</p>
               ) : customers.length === 0 ? (
                 <div className="text-center py-3">
-                  <p className="text-xs text-slate-400">لا يوجد عملاء مطابقون.</p>
+                  <p className="text-xs text-slate-400">{ar.noMatchingCustomers}</p>
                 </div>
               ) : (
                 <div className="max-h-40 overflow-y-auto space-y-1 divide-y divide-slate-800/40">
@@ -176,10 +176,10 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
                       <span className="text-[11px] text-slate-400">
                         {Number(c.balance) > 0 ? (
                           <span className="text-rose-400 font-bold">
-                            دين: {formatCurrencyDisplay(c.balance, currencySymbol, numberFormat)}
+                            {ar.customerDebtLabel(formatCurrencyDisplay(c.balance, currencySymbol, numberFormat))}
                           </span>
                         ) : (
-                          <span className="text-emerald-400 font-medium">لا دين عليه</span>
+                          <span className="text-emerald-400 font-medium">{ar.noDebtOnCustomer}</span>
                         )}
                       </span>
                     </button>

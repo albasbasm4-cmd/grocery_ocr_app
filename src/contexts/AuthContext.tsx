@@ -1,3 +1,4 @@
+import { ar } from '../i18n/ar';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
@@ -80,14 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isOnline()) {
         return {
           success: false,
-          error: 'التحقق من رمز PIN يتطلب اتصالاً فعالاً بالإنترنت لحماية أمان المتجر.',
+          error: ar.pinRequiresOnline,
         };
       }
-      if (!store) return { success: false, error: 'المتجر غير موجود.' };
+      if (!store) return { success: false, error: ar.storeNotFound };
       const { data, error } = await supabase.rpc('verify_admin_pin', { p_store_id: store.id, p_pin: pin });
       if (error) return { success: false, error: error.message };
       const result = data as { ok?: boolean; code?: string; message?: string; expires_at?: string } | null;
-      if (!result?.ok || !result.expires_at) return { success: false, error: result?.message || result?.code || 'رمز PIN غير صحيح.' };
+      if (!result?.ok || !result.expires_at) return { success: false, error: result?.message || result?.code || ar.pinWrong };
       setPinExpiresAt(result.expires_at);
       return { success: true };
     },

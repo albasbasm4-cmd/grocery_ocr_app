@@ -95,10 +95,10 @@ export const PosProductSearch: React.FC<PosProductSearchProps> = ({
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-h-64 overflow-y-auto z-40 p-1.5 divide-y divide-slate-800/80 animate-in fade-in">
           {loading ? (
-            <p className="text-center text-xs text-slate-400 py-3">جارٍ البحث…</p>
+            <p className="text-center text-xs text-slate-400 py-3">{ar.searching}</p>
           ) : results.length === 0 ? (
             <div className="p-3 text-center text-xs text-slate-400">
-              لم يتم العثور على منتجات مطابقة.
+              {ar.noProductsFound}
             </div>
           ) : (
             results.map((product) => {
@@ -122,7 +122,7 @@ export const PosProductSearch: React.FC<PosProductSearchProps> = ({
                     <div>
                       <p className="font-bold text-slate-100">{product.name}</p>
                       <p className="text-[10px] text-slate-400">
-                        {product.barcode ? `باركود: ${product.barcode}` : ''}
+                        {product.barcode ? ar.barcodePrefix(product.barcode) : ''}
                         {product.sku_small_text ? ` | SKU: ${product.sku_small_text}` : ''}
                       </p>
                     </div>
@@ -134,9 +134,9 @@ export const PosProductSearch: React.FC<PosProductSearchProps> = ({
                     </p>
                     <p className="text-[10px] text-slate-400">
                       {outOfStock ? (
-                        <span className="text-rose-400">نفد المخزون</span>
+                        <span className="text-rose-400">{ar.outOfStock}</span>
                       ) : (
-                        `المتاح: ${product.stock_quantity}`
+                        ar.availableStockCount(product.stock_quantity)
                       )}
                     </p>
                   </div>

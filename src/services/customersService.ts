@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Customer, CustomerPayment, Sale } from '../types';
 import { offlineDb } from '../lib/offlineDb';
 import { isOnline, assertOnline } from '../lib/offlineGuard';
+import { ar } from '../i18n/ar';
 
 export interface CreateCustomerInput {
   storeId: string;
@@ -80,10 +81,10 @@ export async function fetchCustomerById(customerId: string): Promise<Customer | 
 }
 
 export async function createCustomer(input: CreateCustomerInput): Promise<Customer> {
-  assertOnline('إضافة عميل جديد');
+  assertOnline(ar.addNewCustomer);
 
   const cleanName = input.name.trim();
-  if (!cleanName) throw new Error('اسم العميل مطلوب.');
+  if (!cleanName) throw new Error(ar.customerNameRequired);
 
   const cleanPhone = input.phone?.trim() || null;
 
@@ -127,11 +128,11 @@ export async function fetchCustomerPayments(customerId: string): Promise<Custome
 }
 
 export async function recordCustomerPayment(customerId: string, amount: string): Promise<CustomerPayment> {
-  assertOnline('تسجيل سداد دفعة للعميل');
+  assertOnline(ar.recordPayment);
 
   const decAmount = new Decimal(amount.trim() || '0');
   if (!decAmount.isFinite() || decAmount.lessThanOrEqualTo(0)) {
-    throw new Error('مبلغ السداد يجب أن يكون أكبر من الصفر.');
+    throw new Error(ar.paymentAmountMustBePositive);
   }
 
   const { data, error } = await supabase.rpc('record_customer_payment', {

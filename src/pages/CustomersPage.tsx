@@ -33,7 +33,7 @@ export default function CustomersPage() {
   const [paymentCustomer, setPaymentCustomer] = useState<Customer | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
-  const currencySymbol = store?.currency_symbol || 'ر.س';
+  const currencySymbol = store?.currency_symbol || ar.defaultCurrencySymbol;
 
   const loadCustomers = useCallback(async () => {
     if (!store) return;
@@ -42,7 +42,7 @@ export default function CustomersPage() {
       const data = await fetchCustomers(store.id, search);
       setCustomers(data);
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'تعذر تحميل بيانات العملاء.', 'error');
+      showToast(err instanceof Error ? err.message : ar.loadCustomersError, 'error');
     } finally {
       setLoading(false);
     }
@@ -85,7 +85,7 @@ export default function CustomersPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-extrabold text-white">{ar.customersTitle}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">إدارة حسابات العملاء ومتابعة الديون والمدفوعات</p>
+          <p className="text-xs text-slate-400 mt-0.5">{ar.customersSubtitle}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export default function CustomersPage() {
             onClick={() => void loadCustomers()}
             disabled={loading}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition"
-            title="تحديث"
+            title={ar.refresh}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -121,11 +121,11 @@ export default function CustomersPage() {
         </div>
         <div className="text-left">
           <span className="text-xs text-slate-400 block mb-1">{ar.customersCount}</span>
-          <span className="text-base font-bold text-slate-200">{customers.length} عميل</span>
+          <span className="text-base font-bold text-slate-200">{ar.customersCountText(customers.length)}</span>
         </div>
       </div>
 
-      {/* شريط البحث وتصفية المدينين */}
+      {/* شريط البحث وتصفية ال{ar.debtor}ين */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-3">
         <div className="flex items-center bg-slate-950 border border-slate-700 focus-within:border-emerald-500 rounded-xl px-3 py-2 text-xs">
           <Search className="w-3.5 h-3.5 text-slate-400 ml-2" />
@@ -175,7 +175,7 @@ export default function CustomersPage() {
           <EmptyState
             icon={<Users className="w-10 h-10 text-slate-500" />}
             title={ar.noCustomersFound}
-            description="يمكنك إضافة عملاء جدد لتسجيل الفواتير الآجلة ومتابعة التحصيل."
+            description={ar.customersEmptyDescription}
           />
         </div>
       ) : (
@@ -200,11 +200,11 @@ export default function CustomersPage() {
                     <h3 className="font-bold text-white text-sm truncate">{customer.name}</h3>
                     {hasDebt ? (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                        مدين
+                        {ar.debtor}
                       </span>
                     ) : (
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        مسدد
+                        {ar.settled}
                       </span>
                     )}
                   </div>
@@ -212,7 +212,7 @@ export default function CustomersPage() {
                     <p className="text-xs text-slate-400 mt-0.5">{customer.phone}</p>
                   )}
                   <p className="text-xs text-slate-400 mt-1">
-                    الرصيد:{' '}
+                    {ar.balanceLabel}{' '}
                     <span
                       className={`font-black ${hasDebt ? 'text-rose-400' : 'text-emerald-400'}`}
                     >

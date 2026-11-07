@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { ar } from '../../i18n/ar';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -68,7 +69,7 @@ export const Modal: React.FC<ModalProps> = ({
             <button
               onClick={onClose}
               className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
-              aria-label="إغلاق"
+              aria-label={ar.closeModal}
             >
               <X className="w-5 h-5" />
             </button>

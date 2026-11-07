@@ -45,7 +45,7 @@ export default function PosPage() {
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [choices, setChoices] = useState<Product[]>([]);
 
-  const currencySymbol = store?.currency_symbol || 'ر.س';
+  const currencySymbol = store?.currency_symbol || ar.defaultCurrencySymbol;
 
   // مزامنة البيانات المحلية عند فتح شاشة البيع إن توفر الاتصال
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function PosPage() {
     if (!store) return;
 
     if (items.length === 0) {
-      showToast('السلة فارغة، أضف منتجات قبل تأكيد البيع.', 'error');
+      showToast(ar.cartEmptySaleError, 'error');
       return;
     }
 
@@ -174,12 +174,12 @@ export default function PosPage() {
       setSuccessReceipt(receiptData);
       setIsSuccessModalOpen(true);
       if (isOffline) {
-        showToast('تم حفظ الفاتورة محلياً بنجاح (بانتظار المزامنة)', 'info');
+        showToast(ar.saleSavedOfflineInfo, 'info');
       } else {
         showToast(ar.saleSuccessDesc, 'success');
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'فشلت عملية البيع.';
+      const msg = err instanceof Error ? err.message : ar.saleFailedError;
       showToast(msg, 'error');
     } finally {
       setIsSubmitting(false);
@@ -298,7 +298,7 @@ export default function PosPage() {
         <div className="fixed bottom-16 left-0 right-0 z-30 p-4 bg-slate-950/95 backdrop-blur-md border-t border-slate-800">
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
             <div>
-              <span className="text-xs text-slate-400 block">{ar.total} النهائي</span>
+              <span className="text-xs text-slate-400 block">{ar.finalTotal}</span>
               <span className="text-2xl font-black text-emerald-400">
                 {formatCurrencyDisplay(totalAmount, currencySymbol, numberFormat)}
               </span>

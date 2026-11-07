@@ -48,7 +48,7 @@ export function FullBackupModal({
         setSuccess(false);
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'فشل تصدير النسخة الاحتياطية.');
+      setError(err instanceof Error ? err.message : ar.backupFailedError);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ export function FullBackupModal({
               <Database className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">النسخ الاحتياطي الشامل</h3>
+              <h3 className="text-sm font-bold text-white">{ar.fullBackupHeading}</h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 {ar.fullBackupDescription}
               </p>
@@ -76,13 +76,13 @@ export function FullBackupModal({
           </div>
 
           <div className="text-xs text-slate-300 space-y-1.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-            <p className="font-bold text-slate-200">البيانات المشمولة في ملف النسخة:</p>
+            <p className="font-bold text-slate-200">{ar.backupIncludedDataHeading}</p>
             <ul className="list-disc list-inside space-y-1 text-slate-400">
-              <li>بيانات المتجر وإعدادات العملة</li>
-              <li>شجرة التصنيفات والمنتجات (تشمل أسعار التكلفة والمخزون)</li>
-              <li>قائمة العملاء وأرصدة الديون الحالية</li>
-              <li>سجل الفواتير الكاملة ولقطات الأسعار والبنود</li>
-              <li>سجل حركات المخزون ودفعات سداد العملاء</li>
+              <li>{ar.backupStoreData}</li>
+              <li>{ar.backupCategoriesProducts}</li>
+              <li>{ar.backupCustomersDebts}</li>
+              <li>{ar.backupInvoicesSnapshots}</li>
+              <li>{ar.backupMovementsPayments}</li>
             </ul>
           </div>
 
@@ -100,7 +100,7 @@ export function FullBackupModal({
             </div>
           )}
 
-          {loading && <LoadingSpinner message="جاري استخراج وتجهيز النسخة الاحتياطية..." />}
+          {loading && <LoadingSpinner message={ar.extractingBackupProgress} />}
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
             <Button variant="outline" size="sm" onClick={onClose} disabled={loading}>

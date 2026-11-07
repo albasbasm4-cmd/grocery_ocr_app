@@ -71,7 +71,7 @@ export default function SettingsPage() {
     navigate('/login', { replace: true });
   };
 
-  const displayCurrencySymbol = store?.currency_symbol || 'ر.س';
+  const displayCurrencySymbol = store?.currency_symbol || ar.defaultCurrencySymbol;
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -135,7 +135,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-sm">
                 <span className="text-slate-400">{ar.currencyLabel}</span>
                 <span className="font-bold text-emerald-400">
-                  {store?.currency_code || 'SAR'} ({store?.currency_symbol || 'ر.س'})
+                  {store?.currency_code || ar.defaultCurrencyCode} ({store?.currency_symbol || ar.defaultCurrencySymbol})
                 </span>
               </div>
             </>
@@ -187,7 +187,7 @@ export default function SettingsPage() {
                 {numberFormat === 'arabic' && <Check className="w-4 h-4 text-emerald-400" />}
                 <span className="text-sm">{ar.arabicNumbers}</span>
               </div>
-              <span className="text-xs font-sans opacity-80">١٢٣٤٥٦٧٨٩٠</span>
+              {/* 1234567890 */}<span className="text-xs font-sans opacity-80">{"\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669\u0660"}</span>
             </button>
           </div>
 
@@ -240,7 +240,7 @@ export default function SettingsPage() {
             <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
               <Receipt className="w-5 h-5" />
             </div>
-            <CardTitle>الفواتير والحسابات</CardTitle>
+            <CardTitle>{ar.invoicesAndAccounts}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -376,13 +376,13 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-amber-200 text-xs leading-relaxed space-y-1.5">
               <div className="font-bold flex items-center gap-1.5 text-amber-300 text-sm">
-                <span>⚠️ تحذير: فواتير غير مُزامنة!</span>
+                <span>{ar.unsyncedInvoicesWarning}</span>
               </div>
               <p>
-                توجد <span className="font-extrabold underline">{pendingSalesCount}</span> عملية بيع محفوظة محلياً ولم تتم مزامنتها مع الخادم بعد.
+                {ar.unsyncedInvoicesCountMsg(pendingSalesCount)}
               </p>
               <p className="text-slate-300">
-                تسجيل الخروج الآن لن يحذف هذه البيانات من جهازك، لكن لن تظهر في تقارير الخادم حتى تتم المزامنة. يفضل المزامنة أولاً قبل الخروج.
+                {ar.logoutUnsyncedWarningDesc}
               </p>
             </div>
             {navigator.onLine && (
@@ -404,7 +404,7 @@ export default function SettingsPage() {
                   }
                 }}
               >
-                {isSyncingBeforeLogout ? 'جارٍ المزامنة...' : '🔄 مزامنة الفواتير الآن قبل الخروج'}
+                {isSyncingBeforeLogout ? ar.syncingNow : ar.syncBeforeLogoutBtn}
               </Button>
             )}
             <p className="text-xs text-slate-400">

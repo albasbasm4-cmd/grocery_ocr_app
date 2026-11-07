@@ -3,6 +3,7 @@ import { Category } from '../types';
 import { normalizeArabic } from '../lib/arabic';
 import { offlineDb } from '../lib/offlineDb';
 import { isOnline, assertOnline } from '../lib/offlineGuard';
+import { ar } from '../i18n/ar';
 
 export const DEFAULT_SUGGESTED_CATEGORIES = [
   'ألبان',
@@ -43,11 +44,11 @@ export async function fetchCategories(storeId: string): Promise<Category[]> {
 }
 
 export async function createCategory(storeId: string, name: string): Promise<Category> {
-  assertOnline('إضافة تصنيف جديد');
+  assertOnline(ar.addCategory);
 
   const trimmed = name.trim();
   if (!trimmed) {
-    throw new Error('اسم التصنيف مطلوب');
+    throw new Error(ar.categoryNameRequired);
   }
 
   const { data, error } = await supabase
@@ -62,7 +63,7 @@ export async function createCategory(storeId: string, name: string): Promise<Cat
 
   if (error) {
     if (error.code === '23505') {
-      throw new Error('يوجد تصنيف آخر بنفس هذا الاسم في المتجر.');
+      throw new Error(ar.duplicateCategory);
     }
     throw new Error(error.message);
   }
@@ -73,11 +74,11 @@ export async function createCategory(storeId: string, name: string): Promise<Cat
 }
 
 export async function updateCategory(categoryId: string, name: string): Promise<Category> {
-  assertOnline('تعديل اسم التصنيف');
+  assertOnline(ar.editCategory);
 
   const trimmed = name.trim();
   if (!trimmed) {
-    throw new Error('اسم التصنيف مطلوب');
+    throw new Error(ar.categoryNameRequired);
   }
 
   const { data, error } = await supabase
@@ -92,7 +93,7 @@ export async function updateCategory(categoryId: string, name: string): Promise<
 
   if (error) {
     if (error.code === '23505') {
-      throw new Error('يوجد تصنيف آخر بنفس هذا الاسم في المتجر.');
+      throw new Error(ar.duplicateCategory);
     }
     throw new Error(error.message);
   }
@@ -119,7 +120,7 @@ export async function deleteCategory(
   categoryId: string,
   targetCategoryIdToMove?: string
 ): Promise<void> {
-  assertOnline('حذف التصنيف');
+  assertOnline(ar.deleteCategory);
 
   // إذا طُلب نقل المنتجات أولاً إلى تصنيف آخر
   if (targetCategoryIdToMove) {
@@ -129,14 +130,14 @@ export async function deleteCategory(
       .eq('category_id', categoryId);
 
     if (moveError) {
-      throw new Error(`تعذر نقل المنتجات: ${moveError.message}`);
+      throw new Error(ar.actionMoveProductsError(moveError.message));
     }
   } else {
     // تحقق من عدم وجود منتجات تمنع الحذف
     const count = await countProductsInCategory(categoryId);
     if (count > 0) {
       throw new Error(
-        `لا يمكن حذف هذا التصنيف لأنه يحتوي على (${count}) منتج. يرجى نقل المنتجات أولاً أو حذفها.`
+        ar.categoryDeleteCountBlocked(count)
       );
     }
   }

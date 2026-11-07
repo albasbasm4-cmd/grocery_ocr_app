@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { formatCurrencyDisplay, formatNumberDisplay } from '../lib/numbers';
+import { ar } from '../i18n/ar';
 
 export type NumberFormat = 'latin' | 'arabic';
 
@@ -29,7 +30,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return formatNumberDisplay(value, numberFormat, options);
   };
 
-  const formatCurrency = (amount: number | string | null | undefined, currencySymbol = 'ر.س', decimals = 2) => {
+  const formatCurrency = (amount: number | string | null | undefined, currencySymbol = ar.defaultCurrencySymbol, decimals = 2) => {
     return formatCurrencyDisplay(amount, currencySymbol, numberFormat, decimals);
   };
 

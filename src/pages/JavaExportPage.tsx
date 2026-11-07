@@ -262,7 +262,7 @@ export default function JavaExportPage() {
             <Code2 className="w-4 h-4 text-emerald-400" />
             <span>{className || 'ProductRepository'}.java</span>
           </div>
-          <span className="text-[11px] text-slate-500">UTF-8 • Java 17+</span>
+          <span className="text-[11px] text-slate-500">UTF-8 - Java 17+</span>
         </div>
 
         <div className="p-0 bg-slate-950 max-h-[420px] overflow-auto scrollbar-thin scrollbar-thumb-slate-800">

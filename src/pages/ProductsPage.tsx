@@ -127,12 +127,12 @@ export default function ProductsPage() {
   });
 
   const openCreate = () => {
-    if (!ensureOnlineWithToast('إضافة منتج جديد', showToast)) return;
+    if (!ensureOnlineWithToast(ar.actionOnlineAddNewProduct, showToast)) return;
     setEditingProduct(null);
     setFormOpen(true);
   };
   const openEdit = (product: Product) => {
-    if (!ensureOnlineWithToast('تعديل بيانات المنتج وسعر البيع', showToast)) return;
+    if (!ensureOnlineWithToast(ar.actionOnlineEditProduct, showToast)) return;
     setEditingProduct(product);
     setFormOpen(true);
   };
@@ -149,13 +149,13 @@ export default function ProductsPage() {
     setEditingProduct(null);
   };
   const requestProductStateChange = (product: Product) => {
-    if (!ensureOnlineWithToast('تعطيل أو تفعيل المنتج', showToast)) return;
+    if (!ensureOnlineWithToast(ar.actionOnlineToggleProduct, showToast)) return;
     setActionProduct(product);
     setNextActiveState(!product.is_active);
     setPinOpen(true);
   };
   const requestStockAdjustment = (product: Product) => {
-    if (!ensureOnlineWithToast('تسوية المخزون يدوياً', showToast)) return;
+    if (!ensureOnlineWithToast(ar.actionOnlineAdjustStock, showToast)) return;
     setStockProduct(product);
   };
   const loadMore = productsQuery.hasNextPage && !productsQuery.isFetchingNextPage;
@@ -289,8 +289,8 @@ export default function ProductsPage() {
                   </div>
                   <div className="flex items-end justify-between gap-3">
                     <div>
-                      <p className="text-sm font-bold text-emerald-300">{ar.sellingPrice}: {formatCurrency(product.price, store?.currency_symbol || 'ر.س', 2)}</p>
-                      {canSeeCost && <p className="mt-1 text-xs text-slate-500">{ar.costPrice}: {formatCurrency(product.cost_price, store?.currency_symbol || 'ر.س', 2)}</p>}
+                      <p className="text-sm font-bold text-emerald-300">{ar.sellingPrice}: {formatCurrency(product.price, store?.currency_symbol || ar.defaultCurrencySymbol, 2)}</p>
+                      {canSeeCost && <p className="mt-1 text-xs text-slate-500">{ar.costPrice}: {formatCurrency(product.cost_price, store?.currency_symbol || ar.defaultCurrencySymbol, 2)}</p>}
                       {!product.is_active && <span className="mt-1 inline-block rounded-md bg-slate-700 px-2 py-0.5 text-[10px] text-slate-300">{ar.inactive}</span>}
                     </div>
                     <div className="flex shrink-0 gap-1">
@@ -336,7 +336,7 @@ export default function ProductsPage() {
           storeId={store?.id || ''}
           onSuccess={() => {
             void queryClient.invalidateQueries({ queryKey: ['products'] });
-            showToast('تم استيراد المنتجات بنجاح.', 'success');
+            showToast(ar.productsImportSuccess, 'success');
           }}
         />
       )}

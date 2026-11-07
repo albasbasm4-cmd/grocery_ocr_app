@@ -82,7 +82,7 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
   const performReturn = async () => {
     const itemsToReturn = getValidReturnPayload();
     if (itemsToReturn.length === 0) {
-      setError('يرجى إدخال كمية مرجعة لبند واحد على الأقل.');
+      setError(ar.returnMinOneItem);
       return;
     }
 
@@ -95,7 +95,7 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
       onSuccess(res.totalRefundAmount);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'فشلت عملية الإرجاع.');
+      setError(err instanceof Error ? err.message : ar.returnFailedError);
     } finally {
       setIsSubmitting(false);
     }
@@ -104,7 +104,7 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
   const handleStartReturn = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isOwner) {
-      setError('إرجاع البضاعة متاح لمالك المتجر فقط.');
+      setError(ar.returnOwnerOnlyError);
       return;
     }
 
@@ -115,7 +115,7 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
 
     const payload = getValidReturnPayload();
     if (payload.length === 0) {
-      setError('يرجى تحديد الكمية المراد إرجاعها.');
+      setError(ar.selectReturnQtyPrompt);
       return;
     }
 
@@ -149,12 +149,12 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-slate-100 truncate">{item.product_name_snapshot}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      تم شراء: {item.quantity} | السعر: {formatCurrencyDisplay(item.unit_price_snapshot, currencySymbol, numberFormat)}
+                      {ar.purchasedQtyPrice(item.quantity, formatCurrencyDisplay(item.unit_price_snapshot, currencySymbol, numberFormat))}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <label className="text-[11px] text-slate-400 shrink-0">إرجاع:</label>
+                    <label className="text-[11px] text-slate-400 shrink-0">{ar.returnLabel}</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -181,7 +181,7 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
                 setReason(e.target.value);
                 setError(null);
               }}
-              placeholder="مثال: منتج تالف / طلب تبديل"
+              placeholder={ar.returnReasonExample}
               className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs outline-none focus:border-emerald-500 text-right"
             />
           </div>
@@ -207,8 +207,8 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
         isOpen={isPinModalOpen}
         onClose={() => setIsPinModalOpen(false)}
         onSuccess={() => void performReturn()}
-        title="تأكيد رمز PIN للمدير"
-        description="إرجاع البضاعة يتطلب التحقق من رمز PIN الإداري."
+        title={ar.pinConfirmOwnerTitle}
+        description={ar.pinConfirmReturnDesc}
       />
     </>
   );

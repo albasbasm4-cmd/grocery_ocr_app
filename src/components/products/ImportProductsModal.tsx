@@ -128,7 +128,7 @@ export function ImportProductsModal({
       setMapping(initialMapping);
       setStep('mapping');
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'فشل قراءة الملف.');
+      setParseError(err instanceof Error ? err.message : ar.parseFileError);
     } finally {
       setParsing(false);
     }
@@ -186,7 +186,7 @@ export function ImportProductsModal({
       setStep('results');
       onSuccess();
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'فشل الاستيراد.');
+      setParseError(err instanceof Error ? err.message : ar.importFailedError);
       setStep('validation');
     }
   };
@@ -240,7 +240,7 @@ export function ImportProductsModal({
                 />
               </div>
 
-              {parsing && <LoadingSpinner message="جاري قراءة وتحليل محتويات الملف..." />}
+              {parsing && <LoadingSpinner message={ar.parsingFileProgress} />}
 
               {parseError && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
@@ -258,7 +258,7 @@ export function ImportProductsModal({
                     </div>
                     <div>
                       <p className="text-sm font-bold text-white">{ar.templateDownloadHint}</p>
-                      <p className="text-xs text-slate-400">يحتوي على كافة الأعمدة بالترتيب وأمثلة عملية للبقالة</p>
+                      <p className="text-xs text-slate-400">{ar.templateHasAllCols}</p>
                     </div>
                   </div>
                   <Button
@@ -283,7 +283,7 @@ export function ImportProductsModal({
                     {ar.fileParsedSuccess.replace('{rows}', String(rawRows.length))}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    {selectedFile ? `الملف: ${selectedFile.name} | ` : ''}
+                    {selectedFile ? ar.selectedFilePrefix(selectedFile.name) : ''}
                     {ar.mapColumnsPrompt}
                   </p>
                 </div>
@@ -293,7 +293,7 @@ export function ImportProductsModal({
                   onClick={() => setStep('file')}
                   icon={<ArrowRight className="w-4 h-4" />}
                 >
-                  تغيير الملف
+                  {ar.changeFile}
                 </Button>
               </div>
 
@@ -309,7 +309,7 @@ export function ImportProductsModal({
                         <th className="p-2 border-b border-slate-800">#</th>
                         {rawHeaders.map((h, i) => (
                           <th key={i} className="p-2 border-b border-slate-800 font-bold text-slate-300">
-                            {h || `عمود ${i + 1}`}
+                            {h || ar.columnN(i + 1)}
                           </th>
                         ))}
                       </tr>
@@ -362,7 +362,7 @@ export function ImportProductsModal({
                       <option value="-1">{ar.unmapped}</option>
                       {rawHeaders.map((header, hIdx) => (
                         <option key={hIdx} value={hIdx}>
-                          {header || `عمود ${hIdx + 1}`}
+                          {header || ar.columnN(hIdx + 1)}
                         </option>
                       ))}
                     </select>
@@ -377,7 +377,7 @@ export function ImportProductsModal({
                   disabled={mapping.name === -1 || mapping.price === -1}
                   icon={<ArrowLeft className="w-4 h-4" />}
                 >
-                  التالي: فحص البيانات
+                  {ar.nextValidateData}
                 </Button>
               </div>
             </div>
@@ -389,15 +389,15 @@ export function ImportProductsModal({
               {/* ملخص التحقق */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <Card className="p-3 bg-slate-900 text-center">
-                  <p className="text-xs text-slate-400">إجمالي الصفوف</p>
+                  <p className="text-xs text-slate-400">{ar.totalRows}</p>
                   <p className="text-lg font-black text-white">{validation.totalRows}</p>
                 </Card>
                 <Card className="p-3 bg-emerald-950/20 border-emerald-500/30 text-center">
-                  <p className="text-xs text-emerald-400">صفوف صالحة</p>
+                  <p className="text-xs text-emerald-400">{ar.validRows}</p>
                   <p className="text-lg font-black text-emerald-300">{validation.validRows.length}</p>
                 </Card>
                 <Card className={`p-3 text-center ${validation.invalidRows.length > 0 ? 'bg-rose-950/20 border-rose-500/30' : 'bg-slate-900'}`}>
-                  <p className="text-xs text-slate-400">صفوف بها أخطاء</p>
+                  <p className="text-xs text-slate-400">{ar.rowsWithErrors}</p>
                   <p className={`text-lg font-black ${validation.invalidRows.length > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
                     {validation.invalidRows.length}
                   </p>
@@ -412,7 +412,7 @@ export function ImportProductsModal({
                     <span>{ar.duplicateBarcodesDetected.replace('{count}', String(validation.duplicateBarcodesInFile.length))}</span>
                   </div>
                   <p className="text-[11px] text-amber-200/80">
-                    تم رصد باركودات مكررة لنفس الصنف داخل الملف: ({validation.duplicateBarcodesInFile.slice(0, 5).join('، ')})
+                    {ar.duplicateBarcodesInFileMsg(validation.duplicateBarcodesInFile.slice(0, 5).join(', '))}
                   </p>
                 </div>
               )}
@@ -489,7 +489,7 @@ export function ImportProductsModal({
 
               <div className="flex justify-between items-center pt-2 border-t border-slate-800">
                 <Button variant="outline" size="sm" onClick={() => setStep('mapping')}>
-                  رجوع لتعديل الأعمدة
+                  {ar.backToEditColumns}
                 </Button>
                 <Button
                   variant="primary"
@@ -497,7 +497,7 @@ export function ImportProductsModal({
                   disabled={validation.validRows.length === 0}
                   icon={<CheckCircle2 className="w-4 h-4" />}
                 >
-                  {ar.startImportBtn} ({validation.validRows.length} صف)
+                  {ar.startImportWithRowsCount(validation.validRows.length)}
                 </Button>
               </div>
             </div>
@@ -567,7 +567,7 @@ export function ImportProductsModal({
                 <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/30 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-rose-300 text-xs">
                     <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>توجد {importResult.rejections.length} صفوف مرفوضة أو لم يتم استيرادها.</span>
+                    <span>{ar.rejectedRowsNotice(importResult.rejections.length)}</span>
                   </div>
                   <Button
                     size="sm"
@@ -582,7 +582,7 @@ export function ImportProductsModal({
 
               <div className="pt-3 border-t border-slate-800 flex justify-end">
                 <Button variant="primary" onClick={onClose}>
-                  إغلاق ومتابعة المنتجات
+                  {ar.closeAndContinueProducts}
                 </Button>
               </div>
             </div>

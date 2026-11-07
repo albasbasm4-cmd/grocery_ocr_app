@@ -61,7 +61,7 @@ export const PinPromptModal: React.FC<PinPromptModalProps> = ({
 
         <div>
           <label className="mb-1 block text-xs font-semibold text-slate-700">
-            رمز PIN (٤ إلى ٦ أرقام)
+            {ar.pin}
           </label>
           <input
             type="password"
@@ -73,7 +73,7 @@ export const PinPromptModal: React.FC<PinPromptModalProps> = ({
               setPin(toLatinDigits(e.target.value).replace(/\D/g, '').slice(0, 6));
               setError(null);
             }}
-            placeholder="••••"
+            placeholder="****"
             className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-2xl font-bold tracking-widest text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
             autoFocus
           />

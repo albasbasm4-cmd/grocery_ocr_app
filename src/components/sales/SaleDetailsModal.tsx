@@ -45,7 +45,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
     try {
       setSharing(true);
       const receipt: PrintableReceipt = {
-        storeName: 'متجر البقالة',
+        storeName: ar.groceryStoreFallback,
         currencySymbol,
         saleId: sale.id,
         createdAt: sale.created_at,
@@ -74,14 +74,14 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title={`تفاصيل الفاتورة #${sale.id.slice(0, 8).toUpperCase()}`}
+        title={ar.invoiceDetailsTitle(sale.id.slice(0, 8).toUpperCase())}
         maxWidth="lg"
       >
         <div className="space-y-4 text-xs">
           {/* شريط معلومات الفاتورة والحالة */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950 p-3 rounded-2xl border border-slate-800">
             <div>
-              <span className="text-[11px] text-slate-400 block mb-0.5">الحالة</span>
+              <span className="text-[11px] text-slate-400 block mb-0.5">{ar.status}</span>
               <span
                 className={`inline-block px-2 py-0.5 rounded-full font-bold text-[11px] ${
                   isCompleted
@@ -94,23 +94,23 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             </div>
 
             <div>
-              <span className="text-[11px] text-slate-400 block mb-0.5">طريقة الدفع</span>
+              <span className="text-[11px] text-slate-400 block mb-0.5">{ar.paymentMethod}</span>
               <span className="font-bold text-slate-200">
                 {sale.payment_method === 'cash' ? ar.paymentCash : ar.paymentCredit}
               </span>
             </div>
 
             <div>
-              <span className="text-[11px] text-slate-400 block mb-0.5">التاريخ</span>
+              <span className="text-[11px] text-slate-400 block mb-0.5">{ar.date}</span>
               <span className="font-medium text-slate-300">
                 {new Date(sale.created_at).toLocaleDateString('ar-SA')}
               </span>
             </div>
 
             <div>
-              <span className="text-[11px] text-slate-400 block mb-0.5">العميل</span>
+              <span className="text-[11px] text-slate-400 block mb-0.5">{ar.customerLabel.replace(":", "")}</span>
               <span className="font-bold text-amber-300 truncate block">
-                {sale.customer ? sale.customer.name : 'زبون نقدي'}
+                {sale.customer ? sale.customer.name : ar.cashCustomer}
               </span>
             </div>
           </div>
@@ -120,11 +120,11 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
             <h4 className="font-bold text-slate-200 text-sm mb-2">{ar.saleItems}</h4>
             <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800/80">
               <div className="grid grid-cols-12 p-2.5 font-bold text-slate-400 bg-slate-900/60 text-[11px]">
-                <div className={isOwner ? 'col-span-4' : 'col-span-6'}>المنتج</div>
-                <div className="col-span-2 text-center">الكمية</div>
-                <div className="col-span-2 text-left">السعر</div>
-                {isOwner && <div className="col-span-2 text-left text-slate-400">التكلفة</div>}
-                <div className="col-span-2 text-left">الإجمالي</div>
+                <div className={isOwner ? 'col-span-4' : 'col-span-6'}>{ar.productLabel}</div>
+                <div className="col-span-2 text-center">{ar.quantity}</div>
+                <div className="col-span-2 text-left">{ar.price}</div>
+                {isOwner && <div className="col-span-2 text-left text-slate-400">{ar.costLabel}</div>}
+                <div className="col-span-2 text-left">{ar.total}</div>
               </div>
 
               {sale.items.map((item) => {
@@ -161,7 +161,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
                             </span>
                             {lineProfit && (
                               <span className="block text-[10px] text-emerald-400 font-semibold">
-                                ربح: {formatCurrencyDisplay(lineProfit, currencySymbol, numberFormat)}
+                                {ar.profitLabel}: {formatCurrencyDisplay(lineProfit, currencySymbol, numberFormat)}
                               </span>
                             )}
                           </>
@@ -258,7 +258,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
         currencySymbol={currencySymbol}
         numberFormat={numberFormat}
         onSuccess={(refund) => {
-          showToast(`${ar.returnSuccess} (المبلغ: ${refund} ${currencySymbol})`, 'success');
+          showToast(ar.returnSuccessRefund(refund, currencySymbol), 'success');
           onUpdated();
           onClose();
         }}

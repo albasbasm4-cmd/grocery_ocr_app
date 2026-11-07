@@ -110,7 +110,7 @@ export const DiscountSection: React.FC<DiscountSectionProps> = ({ currencySymbol
             {isExceeded && (
               <p className="text-[11px] text-rose-400 mt-1 font-medium">
                 {discountType === 'percentage'
-                  ? 'لا يمكن للنسبة أن تتجاوز 100%'
+                  ? ar.discountExceeds100
                   : ar.discountExceedsSubtotal}
               </p>
             )}

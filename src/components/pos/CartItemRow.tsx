@@ -87,7 +87,7 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            سعر الوحدة: {formatCurrencyDisplay(item.product.price, currencySymbol, numberFormat)}
+            {ar.unitPriceDisplay(formatCurrencyDisplay(item.product.price, currencySymbol, numberFormat))}
           </p>
         </div>
 
@@ -110,7 +110,7 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
             type="button"
             onClick={() => handleStep(-1)}
             className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 flex items-center justify-center font-bold text-lg active:scale-95 transition"
-            aria-label="تقليل"
+            aria-label={ar.decrease}
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
@@ -128,7 +128,7 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
             type="button"
             onClick={() => handleStep(1)}
             className="w-8 h-8 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 flex items-center justify-center font-bold text-lg active:scale-95 transition"
-            aria-label="زيادة"
+            aria-label={ar.increase}
           >
             <Plus className="w-3.5 h-3.5" />
           </button>

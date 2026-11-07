@@ -118,7 +118,7 @@ export default function DashboardPage() {
     };
   }, [store?.id]);
 
-  const currencySymbol = store?.currency_symbol || 'ر.س';
+  const currencySymbol = store?.currency_symbol || ar.defaultCurrencySymbol;
 
   return (
     <div className="space-y-4">

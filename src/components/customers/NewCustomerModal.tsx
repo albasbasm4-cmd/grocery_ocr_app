@@ -31,7 +31,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
 
     const cleanName = name.trim();
     if (!cleanName) {
-      setError('يرجى إدخال اسم العميل.');
+      setError(ar.customerNameRequired);
       return;
     }
 
@@ -49,7 +49,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
       onSuccess(newCustomer);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'حدث خطأ أثناء إضافة العميل.');
+      setError(err instanceof Error ? err.message : ar.addCustomerError);
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               setName(e.target.value);
               setError(null);
             }}
-            placeholder="مثال: محمد العمري"
+            placeholder={ar.customerNameExample}
             className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm outline-none focus:border-emerald-500 text-right"
             autoFocus
           />
@@ -84,7 +84,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
 
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-            {ar.customerPhone} (اختياري)
+            {ar.customerPhoneOptional}
           </label>
           <input
             type="tel"

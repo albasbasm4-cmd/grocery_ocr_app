@@ -54,7 +54,7 @@ export default function ReportsPage() {
     enabled: Boolean(store?.id && from && to && from <= to),
     staleTime: 30_000,
   });
-  const currency = store?.currency_symbol || 'ر.س';
+  const currency = store?.currency_symbol || ar.defaultCurrencySymbol;
   const totalRevenue = useMemo(() => (data?.sales_daily ?? []).reduce((sum, row) => sum.plus(row.revenue), new Decimal(0)), [data?.sales_daily]);
   const invoiceCount = useMemo(() => (data?.sales_daily ?? []).reduce((sum, row) => sum + Number(row.invoice_count), 0), [data?.sales_daily]);
   const averageInvoice = invoiceCount > 0 ? totalRevenue.div(invoiceCount) : new Decimal(0);
@@ -64,11 +64,11 @@ export default function ReportsPage() {
     setPreset(value);
     if (value !== 'custom') { const dates = presetDates(value); setFrom(dates.from); setTo(dates.to); }
   };
-  const exportExcel = async () => { if (!data) return; try { await shareOrDownloadReport(exportReportsWorkbook(data), `تقارير-${from}-${to}.xlsx`, 'تقارير المتجر Excel'); } catch { showToast(t.exportError, 'error'); } };
-  const exportCsv = async () => { if (!data) return; try { await shareOrDownloadReport(exportReportsCsv(data), `مبيعات-${from}-${to}.csv`, 'تقرير المبيعات CSV'); } catch { showToast(t.exportError, 'error'); } };
+  const exportExcel = async () => { if (!data) return; try { await shareOrDownloadReport(exportReportsWorkbook(data), ar.reportsFilenameExcel(from, to), ar.storeReportsExcelTitle); } catch { showToast(t.exportError, 'error'); } };
+  const exportCsv = async () => { if (!data) return; try { await shareOrDownloadReport(exportReportsCsv(data), ar.reportsFilenameCsv(from, to), ar.salesReportCsvTitle); } catch { showToast(t.exportError, 'error'); } };
   const exportPdf = async () => {
     if (!data) return;
-    try { await shareReportPdf(data, 'تقارير المتجر'); }
+    try { await shareReportPdf(data, ar.storeReportsPdfTitle); }
     catch { showToast(t.pdfError, 'error'); }
   };
 
@@ -104,8 +104,8 @@ export default function ReportsPage() {
         </Card>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <ReportList title={t.mostSold} icon={<TrendingUp className="h-4 w-4 text-emerald-400" />} rows={data.products_top.map((row) => ({ name: row.name, value: `${formatNumber(row.quantity_sold)} ${row.revenue ? `· ${formatNumber(row.revenue)} ${currency}` : ''}` }))} />
-          <ReportList title={t.leastMovement} icon={<TrendingDown className="h-4 w-4 text-amber-400" />} rows={data.products_slow.map((row) => ({ name: row.name, value: `${formatNumber(row.quantity_sold)} · ${formatNumber(row.revenue)} ${currency}` }))} />
+          <ReportList title={t.mostSold} icon={<TrendingUp className="h-4 w-4 text-emerald-400" />} rows={data.products_top.map((row) => ({ name: row.name, value: `${formatNumber(row.quantity_sold)} ${row.revenue ? `- ${formatNumber(row.revenue)} ${currency}` : ''}` }))} />
+          <ReportList title={t.leastMovement} icon={<TrendingDown className="h-4 w-4 text-amber-400" />} rows={data.products_slow.map((row) => ({ name: row.name, value: `${formatNumber(row.quantity_sold)} - ${formatNumber(row.revenue)} ${currency}` }))} />
         </div>
 
         {isOwner && data.profit_summary && <>
@@ -128,7 +128,7 @@ export default function ReportsPage() {
 
         <Card className="border-rose-500/20">
           <div className="mb-3 flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 font-bold text-white"><CalendarClock className="h-4 w-4 text-rose-400" />{t.expiry}</h2><label className="flex items-center gap-2 text-xs text-slate-400">{t.within}<input type="number" min="1" max="365" value={expiryDays} onChange={(event) => setExpiryDays(Math.min(365, Math.max(1, Number(event.target.value) || 1)))} className="w-16 rounded-lg border border-slate-700 bg-slate-950 p-2 text-center text-white" />{t.days}</label></div>
-          {data.expiring.length ? <div className="space-y-2">{data.expiring.slice(0, 30).map((row) => { const expired = row.days_remaining < 0; return <div key={row.id} className={`flex items-center justify-between gap-2 rounded-xl p-3 ${expired ? 'bg-rose-950/60' : 'bg-slate-950/70'}`}><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-100">{row.name}</p><p className="text-[11px] text-slate-400">{row.category_name ?? t.categoryNone} · {row.expiry_date}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${expired ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/15 text-amber-300'}`}>{expired ? `${t.expiredSince} ${Math.abs(row.days_remaining)} ${t.day}` : `${t.remaining} ${row.days_remaining} ${t.day}`}</span></div>; })}</div> : <Empty text={t.noExpiry} />}
+          {data.expiring.length ? <div className="space-y-2">{data.expiring.slice(0, 30).map((row) => { const expired = row.days_remaining < 0; return <div key={row.id} className={`flex items-center justify-between gap-2 rounded-xl p-3 ${expired ? 'bg-rose-950/60' : 'bg-slate-950/70'}`}><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-100">{row.name}</p><p className="text-[11px] text-slate-400">{row.category_name ?? t.categoryNone} - {row.expiry_date}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${expired ? 'bg-rose-500/20 text-rose-300' : 'bg-amber-500/15 text-amber-300'}`}>{expired ? `${t.expiredSince} ${Math.abs(row.days_remaining)} ${t.day}` : `${t.remaining} ${row.days_remaining} ${t.day}`}</span></div>; })}</div> : <Empty text={t.noExpiry} />}
         </Card>
 
         <Card>
@@ -137,7 +137,7 @@ export default function ReportsPage() {
             <select value={productId} onChange={(event) => setProductId(event.target.value)} className="rounded-xl border border-slate-700 bg-slate-950 p-3 text-xs text-white"><option value="">{t.allProducts}</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
             <select value={movementType} onChange={(event) => setMovementType(event.target.value)} className="rounded-xl border border-slate-700 bg-slate-950 p-3 text-xs text-white"><option value="">{t.allMovements}</option>{[['sale',t.sale],['return',t.return],['purchase',t.purchase],['adjustment',t.adjustment],['damage',t.damage],['void',t.void]].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>
           </div>
-          {data.movements.length ? <div className="max-h-96 space-y-2 overflow-auto">{data.movements.slice(0, 80).map((row) => <div key={row.id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-950/70 p-3 text-xs"><div className="min-w-0"><p className="truncate font-bold text-slate-100">{row.product_name}</p><p className="mt-1 text-slate-500">{movementLabel(row.type)} · {new Date(row.created_at).toLocaleString('ar')}</p>{row.note && <p className="text-slate-400">{row.note}</p>}</div><span className={`shrink-0 font-bold ${Number(row.quantity_delta) < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{Number(row.quantity_delta) > 0 ? '+' : ''}{formatNumber(row.quantity_delta)}</span></div>)}</div> : <Empty text={t.noMovements} />}
+          {data.movements.length ? <div className="max-h-96 space-y-2 overflow-auto">{data.movements.slice(0, 80).map((row) => <div key={row.id} className="flex items-center justify-between gap-2 rounded-xl bg-slate-950/70 p-3 text-xs"><div className="min-w-0"><p className="truncate font-bold text-slate-100">{row.product_name}</p><p className="mt-1 text-slate-500">{movementLabel(row.type)} - {new Date(row.created_at).toLocaleString('ar')}</p>{row.note && <p className="text-slate-400">{row.note}</p>}</div><span className={`shrink-0 font-bold ${Number(row.quantity_delta) < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>{Number(row.quantity_delta) > 0 ? '+' : ''}{formatNumber(row.quantity_delta)}</span></div>)}</div> : <Empty text={t.noMovements} />}
         </Card>
 
         <Card className="border-sky-500/20">
@@ -165,4 +165,4 @@ function Metric({ icon, title, value, tone }: { icon: React.ReactNode; title: st
 }
 function SummaryItem({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) { return <div className="rounded-xl bg-slate-950/70 p-3"><p className="text-xs text-slate-500">{label}</p><p className={`mt-1 font-bold ${highlight ? 'text-emerald-300' : 'text-slate-100'}`}>{value}</p></div>; }
 function Empty({ text }: { text: string }) { return <p className="py-6 text-center text-xs text-slate-500">{text}</p>; }
-function ReportList({ title, icon, rows }: { title: string; icon?: React.ReactNode; rows: Array<{ name: string; value: string }> }) { return <div><h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-200">{icon}{title}</h3>{rows.length ? <div className="space-y-2">{rows.map((row, index) => <div key={`${row.name}-${index}`} className="flex items-center justify-between gap-2 rounded-xl bg-slate-950/70 px-3 py-2"><span className="truncate text-xs text-slate-300">{index + 1}. {row.name}</span><span className="shrink-0 text-xs font-bold text-emerald-300">{row.value}</span></div>)}</div> : <Empty text="لا توجد بيانات للفترة المحددة." />}</div>; }
+function ReportList({ title, icon, rows }: { title: string; icon?: React.ReactNode; rows: Array<{ name: string; value: string }> }) { return <div><h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-200">{icon}{title}</h3>{rows.length ? <div className="space-y-2">{rows.map((row, index) => <div key={`${row.name}-${index}`} className="flex items-center justify-between gap-2 rounded-xl bg-slate-950/70 px-3 py-2"><span className="truncate text-xs text-slate-300">{index + 1}. {row.name}</span><span className="shrink-0 text-xs font-bold text-emerald-300">{row.value}</span></div>)}</div> : <Empty text={ar.noDataForPeriod} />}</div>; }
