@@ -1,6 +1,9 @@
 name: CI / Quality & Tests
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -10,6 +13,21 @@ jobs:
   lint-and-test:
     name: Lint, Typecheck & Automated Tests
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: grocery_pos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: 1. Checkout Repository
@@ -41,3 +59,21 @@ jobs:
 
       - name: 7. Run Test Suite (Offline Sync & Java Export)
         run: npm run test
+
+      - name: 8. Run Database Migrations & Concurrency Tests
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgrespassword
+          PGDATABASE: grocery_pos
+        run: |
+          psql -h 127.0.0.1 -U postgres -d grocery_pos -c "CREATE SCHEMA IF NOT EXISTS auth; CREATE TABLE IF NOT EXISTS auth.users (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), aud VARCHAR(255) DEFAULT 'authenticated', role VARCHAR(255) DEFAULT 'authenticated', email VARCHAR(255), encrypted_password VARCHAR(255) DEFAULT '', email_confirmed_at TIMESTAMPTZ DEFAULT now(), created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()); CREATE OR REPLACE FUNCTION auth.uid() RETURNS UUID AS \$\$ SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid; \$\$ LANGUAGE sql STABLE;"
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            echo "Applying $f..."
+            psql -h 127.0.0.1 -U postgres -d grocery_pos -q -v ON_ERROR_STOP=1 -f "$f"
+          done
+          echo "Running SQL test..."
+          psql -h 127.0.0.1 -U postgres -d grocery_pos -v ON_ERROR_STOP=1 -f supabase/tests/concurrency_sales_test.sql
+          echo "Running parallel bash concurrency test..."
+          bash supabase/tests/concurrency_sales_test.sh

@@ -273,16 +273,29 @@ BEGIN
 
     v_total := v_subtotal - v_discount;
 
-    -- إنشاء سجل المبيعات
-    INSERT INTO sales (
-        store_id, created_by, customer_id, subtotal, discount_amount,
-        total_amount, payment_method, status, client_uuid
-    )
-    VALUES (
-        p_store_id, v_user_id, p_customer_id, v_subtotal, v_discount,
-        v_total, p_payment_method, 'completed', p_client_uuid
-    )
-    RETURNING * INTO v_sale;
+    -- إنشاء سجل المبيعات مع حماية تعارض التزامن لـ Idempotency
+    BEGIN
+        INSERT INTO sales (
+            store_id, created_by, customer_id, subtotal, discount_amount,
+            total_amount, payment_method, status, client_uuid
+        )
+        VALUES (
+            p_store_id, v_user_id, p_customer_id, v_subtotal, v_discount,
+            v_total, p_payment_method, 'completed', p_client_uuid
+        )
+        RETURNING * INTO v_sale;
+    EXCEPTION WHEN unique_violation THEN
+        SELECT * INTO v_existing_sale
+        FROM sales
+        WHERE store_id = p_store_id AND client_uuid = p_client_uuid;
+        IF FOUND THEN
+            RETURN jsonb_build_object(
+                'sale', to_jsonb(v_existing_sale),
+                'idempotent_cached', TRUE
+            );
+        END IF;
+        RAISE;
+    END;
 
     -- خصم المخزون وتسجيل العناصر وحركات المخزون
     FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
