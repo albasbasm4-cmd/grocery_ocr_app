@@ -107,43 +107,34 @@ export async function shareReportPdf(reports: ReportsPayload, title: string): Pr
   lines.push('حركة المخزون');
   reports.movements.forEach((row) => lines.push(`${row.created_at} | ${row.product_name} | ${row.type} | ${row.quantity_delta} | ${row.note ?? ''}`));
 
-  const canvas = document.createElement('canvas');
-  const rowHeight = 38;
-  canvas.width = 1400;
-  canvas.height = Math.max(600, 190 + lines.length * rowHeight);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('تعذر إعداد ملف PDF.');
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 42px Cairo, sans-serif'; ctx.fillText(title, 1320, 68);
-  ctx.font = '20px Cairo, sans-serif'; ctx.fillStyle = '#64748b';
-  ctx.fillText(`الفترة: ${reports.sales_daily[0]?.day ?? '—'} إلى ${reports.sales_daily.at(-1)?.day ?? '—'}`, 1320, 112);
-  let y = 166;
-  for (const line of lines) {
-    if (['المبيعات اليومية','الأكثر مبيعاً','الأقل حركة','الأرباح حسب المنتج','الأرباح حسب التصنيف','قيمة المخزون حسب التصنيف','المخزون المنخفض','قرب انتهاء الصلاحية','حركة المخزون'].includes(line)) {
-      ctx.font = 'bold 23px Cairo, sans-serif'; ctx.fillStyle = '#047857';
-    } else {
-      ctx.font = '19px Cairo, sans-serif'; ctx.fillStyle = '#334155';
-    }
-    ctx.fillText(line, 1320, y, 1260);
-    y += rowHeight;
-  }
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const pagePixelHeight = Math.floor((canvas.width * 297) / 210);
-  const pageCount = Math.ceil(canvas.height / pagePixelHeight);
-  for (let page = 0; page < pageCount; page += 1) {
-    if (page > 0) pdf.addPage();
-    const slice = document.createElement('canvas');
-    slice.width = canvas.width;
-    slice.height = Math.min(pagePixelHeight, canvas.height - page * pagePixelHeight);
-    const sliceContext = slice.getContext('2d');
-    if (!sliceContext) throw new Error('تعذر تجهيز صفحات PDF.');
-    sliceContext.drawImage(canvas, 0, page * pagePixelHeight, canvas.width, slice.height, 0, 0, slice.width, slice.height);
-    const image = slice.toDataURL('image/jpeg', 0.92);
-    const width = 210;
-    const height = (slice.height * width) / slice.width;
-    pdf.addImage(image, 'JPEG', 0, 0, width, height);
-  }
+  const pageLines = 44;
+  const chunks: string[][] = [];
+  for (let index = 0; index < lines.length; index += pageLines) chunks.push(lines.slice(index, index + pageLines));
+  chunks.forEach((page, pageIndex) => {
+    if (pageIndex > 0) pdf.addPage();
+    const canvas = document.createElement('canvas');
+    canvas.width = 1400;
+    canvas.height = 1900;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('تعذر إعداد ملف PDF.');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.direction = 'rtl'; ctx.textAlign = 'right'; ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 42px Cairo, sans-serif'; ctx.fillText(title, 1320, 68);
+    ctx.font = '20px Cairo, sans-serif'; ctx.fillStyle = '#64748b';
+    ctx.fillText(`الفترة: ${reports.sales_daily[0]?.day ?? '—'} إلى ${reports.sales_daily.at(-1)?.day ?? '—'} · ${pageIndex + 1}/${chunks.length}`, 1320, 112);
+    let y = 166;
+    for (const line of page) {
+      if (['المبيعات اليومية','الأكثر مبيعاً','الأقل حركة','الأرباح حسب المنتج','الأرباح حسب التصنيف','قيمة المخزون حسب التصنيف','المخزون المنخفض','قرب انتهاء الصلاحية','حركة المخزون'].includes(line)) {
+        ctx.font = 'bold 23px Cairo, sans-serif'; ctx.fillStyle = '#047857';
+      } else {
+        ctx.font = '19px Cairo, sans-serif'; ctx.fillStyle = '#334155';
+      }
+      ctx.fillText(line, 1320, y, 1260);
+      y += 38;
+    }
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 285);
+  });
   const blob = pdf.output('blob');
   const filename = `reports-${new Date().toISOString().slice(0, 10)}.pdf`;
   if (Capacitor.isNativePlatform()) {
@@ -154,6 +145,23 @@ export async function shareReportPdf(reports: ReportsPayload, title: string): Pr
   }
   if (typeof navigator !== 'undefined' && navigator.share && typeof File !== 'undefined') {
     const file = new File([blob], filename, { type: 'application/pdf' });
+    if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+      await navigator.share({ title, files: [file] });
+      return;
+    }
+  }
+  downloadBlob(blob, filename);
+}
+
+export async function shareOrDownloadReport(blob: Blob, filename: string, title: string): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    const base64 = await blobToBase64(blob);
+    const file = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
+    await Share.share({ title, url: file.uri, dialogTitle: title });
+    return;
+  }
+  if (typeof navigator !== 'undefined' && navigator.share && typeof File !== 'undefined') {
+    const file = new File([blob], filename, { type: blob.type });
     if (!navigator.canShare || navigator.canShare({ files: [file] })) {
       await navigator.share({ title, files: [file] });
       return;

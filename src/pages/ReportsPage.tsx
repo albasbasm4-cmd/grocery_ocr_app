@@ -9,7 +9,7 @@ import { useToast } from '../contexts/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ar } from '../i18n/ar';
-import { downloadBlob, exportReportsCsv, exportReportsWorkbook, fetchStoreReports, shareReportPdf } from '../services/reportsService';
+import { exportReportsCsv, exportReportsWorkbook, fetchStoreReports, shareReportPdf, shareOrDownloadReport } from '../services/reportsService';
 import type { ReportFilter } from '../services/reportsService';
 import Decimal from 'decimal.js';
 
@@ -64,8 +64,8 @@ export default function ReportsPage() {
     setPreset(value);
     if (value !== 'custom') { const dates = presetDates(value); setFrom(dates.from); setTo(dates.to); }
   };
-  const exportExcel = () => { if (!data) return; downloadBlob(exportReportsWorkbook(data), `تقارير-${from}-${to}.xlsx`); };
-  const exportCsv = () => { if (!data) return; downloadBlob(exportReportsCsv(data), `مبيعات-${from}-${to}.csv`); };
+  const exportExcel = async () => { if (!data) return; try { await shareOrDownloadReport(exportReportsWorkbook(data), `تقارير-${from}-${to}.xlsx`, 'تقارير المتجر Excel'); } catch { showToast(t.exportError, 'error'); } };
+  const exportCsv = async () => { if (!data) return; try { await shareOrDownloadReport(exportReportsCsv(data), `مبيعات-${from}-${to}.csv`, 'تقرير المبيعات CSV'); } catch { showToast(t.exportError, 'error'); } };
   const exportPdf = async () => {
     if (!data) return;
     try { await shareReportPdf(data, 'تقارير المتجر'); }
@@ -148,8 +148,8 @@ export default function ReportsPage() {
         <Card>
           <h2 className="mb-3 font-bold text-white">{t.exportTitle}</h2>
           <div className="grid grid-cols-3 gap-2">
-            <Button variant="secondary" size="sm" onClick={exportExcel} icon={<FileSpreadsheet className="h-4 w-4" />}>{t.excel}</Button>
-            <Button variant="secondary" size="sm" onClick={exportCsv} icon={<Download className="h-4 w-4" />}>{t.csv}</Button>
+            <Button variant="secondary" size="sm" onClick={() => void exportExcel()} icon={<FileSpreadsheet className="h-4 w-4" />}>{t.excel}</Button>
+            <Button variant="secondary" size="sm" onClick={() => void exportCsv()} icon={<Download className="h-4 w-4" />}>{t.csv}</Button>
             <Button variant="secondary" size="sm" onClick={() => void exportPdf()} icon={<FileText className="h-4 w-4" />}>{t.pdf}</Button>
           </div>
           <p className="mt-2 text-[11px] text-slate-500">{t.exportNote}</p>

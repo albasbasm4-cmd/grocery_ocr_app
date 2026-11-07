@@ -187,7 +187,7 @@ export const ar = {
     categoryNone: 'بدون تصنيف', quantity: 'الكمية', minQuantity: 'الحد الأدنى', quantityMin: 'الكمية / الحد الأدنى', noLowStock: 'لا توجد منتجات منخفضة المخزون.',
     expiry: 'الصلاحية', within: 'خلال', days: 'يوماً', expiredSince: 'منتهي منذ', remaining: 'باقي', noExpiry: 'لا توجد منتجات قريبة من الانتهاء.',
     stockMovements: 'حركة المخزون', allProducts: 'كل المنتجات', allMovements: 'كل الحركات', sale: 'بيع', return: 'إرجاع', purchase: 'شراء', adjustment: 'تعديل', damage: 'تالف', void: 'إلغاء فاتورة', noMovements: 'لا توجد حركات مخزون في هذه الفترة.',
-    debts: 'ديون العملاء', noDebts: 'لا توجد ديون مستحقة.', exportTitle: 'تصدير ومشاركة التقرير', exportNote: 'تصدير Excel يتضمن الأرباح والتكلفة وقيمة المخزون للمالك فقط.', pdfError: 'تعذر إنشاء أو مشاركة ملف PDF.',
+    debts: 'ديون العملاء', noDebts: 'لا توجد ديون مستحقة.', exportTitle: 'تصدير ومشاركة التقرير', exportError: 'تعذر تصدير أو مشاركة الملف.', exportNote: 'تصدير Excel يتضمن الأرباح والتكلفة وقيمة المخزون للمالك فقط.', pdfError: 'تعذر إنشاء أو مشاركة ملف PDF.',
     csvDate: 'التاريخ', csvInvoiceCount: 'عدد الفواتير', csvSales: 'المبيعات', csvAverage: 'متوسط الفاتورة', csvDiscounts: 'الخصومات',
   },
   dailySalesTitle: 'المبيعات اليومية',
