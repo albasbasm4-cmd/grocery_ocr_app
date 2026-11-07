@@ -1,0 +1,176 @@
+name: Android Build & Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'نوع البناء (release للتوزيع الرسمي أو debug للتجربة)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android APK (${{ github.ref_type == 'tag' && 'Release' || 'Debug' }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Determine Build Type & Version
+        id: vars
+        run: |
+          # تحديد نوع البناء
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BUILD_TYPE="${{ inputs.build_type }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            BUILD_TYPE="release"
+          else
+            BUILD_TYPE="debug"
+          fi
+          echo "BUILD_TYPE=${BUILD_TYPE}" >> $GITHUB_ENV
+
+          # تحديد versionName و versionCode
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            RAW_TAG="${{ github.ref_name }}"
+            VERSION_NAME="${RAW_TAG#v}"
+          else
+            VERSION_NAME="0.1.${{ github.run_number }}"
+          fi
+          VERSION_CODE="${{ github.run_number }}"
+
+          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_ENV
+          echo "VERSION_CODE=${VERSION_CODE}" >> $GITHUB_ENV
+
+          echo "Selected Build Type: ${BUILD_TYPE}"
+          echo "Version Name: ${VERSION_NAME}"
+          echo "Version Code: ${VERSION_CODE}"
+
+      - name: 3. Setup Node.js (with npm cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 4. Install Dependencies
+        run: npm ci
+
+      - name: 5. Build Web Assets (Vite)
+        env:
+          # متغيرات الاتصال العامة فقط (Public Anon Key)
+          # تحذير أمني: لا يتم تمرير service_role ولا مفاتيح الذكاء الاصطناعي إطلاقاً
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_APP_NAME: "بقالة POS"
+        run: npm run build
+
+      - name: 6. Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: 7. Setup Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: 8. Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 9. Prepare Release Keystore (if Secrets exist)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Decoding release keystore from GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            echo "KEYSTORE_PATH=release.keystore" >> $GITHUB_ENV
+            echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}" >> $GITHUB_ENV
+            echo "KEY_ALIAS=${KEY_ALIAS}" >> $GITHUB_ENV
+            echo "KEY_PASSWORD=${KEY_PASSWORD}" >> $GITHUB_ENV
+            echo "Keystore successfully prepared."
+          else
+            echo "Notice: KEYSTORE_BASE64 secret is not provided. Build will proceed unsigned or in debug mode."
+          fi
+
+      - name: 10. Build with Gradle
+        run: |
+          chmod +x android/gradlew
+          cd android
+
+          if [ "${BUILD_TYPE}" = "release" ]; then
+            echo "Building Release APK..."
+            ./gradlew assembleRelease -PversionCode=${VERSION_CODE} -PversionName=${VERSION_NAME} --no-daemon
+          else
+            echo "Building Debug APK..."
+            ./gradlew assembleDebug -PversionCode=${VERSION_CODE} -PversionName=${VERSION_NAME} --no-daemon
+          fi
+
+      - name: 11. Collect & Rename APK Output
+        run: |
+          mkdir -p dist-apk
+          if [ "${BUILD_TYPE}" = "release" ]; then
+            # البحث عن ملف release apk
+            APK_FILE=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+            if [ -z "$APK_FILE" ]; then
+              echo "Error: Release APK file not found!" && exit 1
+            fi
+            TARGET_APK="dist-apk/grocery-pos-v${VERSION_NAME}-release.apk"
+          else
+            # البحث عن ملف debug apk
+            APK_FILE=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+            if [ -z "$APK_FILE" ]; then
+              echo "Error: Debug APK file not found!" && exit 1
+            fi
+            TARGET_APK="dist-apk/grocery-pos-v${VERSION_NAME}-debug.apk"
+          fi
+
+          cp "$APK_FILE" "$TARGET_APK"
+          echo "FINAL_APK_PATH=${TARGET_APK}" >> $GITHUB_ENV
+          echo "FINAL_APK_NAME=$(basename $TARGET_APK)" >> $GITHUB_ENV
+          echo "Generated APK: $TARGET_APK"
+          ls -lh dist-apk
+
+      - name: 12. Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FINAL_APK_NAME }}
+          path: ${{ env.FINAL_APK_PATH }}
+          retention-days: 30
+
+      - name: 13. Create GitHub Release (On Tag Push only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "إصدار بقالة POS v${{ env.VERSION_NAME }}"
+          tag_name: ${{ github.ref_name }}
+          files: ${{ env.FINAL_APK_PATH }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## 📱 تطبيق بقالة POS - الإصدار الرسمي v${{ env.VERSION_NAME }}
+            
+            - **رقم البناء (Version Code):** `${{ env.VERSION_CODE }}`
+            - **اسم الإصدار (Version Name):** `${{ env.VERSION_NAME }}`
+            - **ملف التثبيت المرفق:** `${{ env.FINAL_APK_NAME }}`
+            
+            ### 🚀 خطوات التثبيت على الهاتف:
+            1. حمل ملف الـ APK المرفق أدناه إلى هاتفك الأندرويد.
+            2. افتح الملف واضغط **تثبيت (Install)**.
+            3. في حال ظهر تنبيه "تثبيت تطبيقات غير معروفة"، اسمح بالتثبيت للمتابعة.

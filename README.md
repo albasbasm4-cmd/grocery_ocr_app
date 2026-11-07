@@ -336,3 +336,138 @@ npm run cap:android
 - شاشة `/java-export` متاحة للمالك فقط. تولّد `ProductRepository.java` وداخلها `Product`، تستخدم `BigDecimal` للقيم، وتهرّب النصوص؛ يتاح نسخ الكود وتنزيله ومشاركته.
 - اختبار ترجمة وتوليد Java: `npx tsx tests/javaExportCompileTest.ts` (يتطلب Node وNix/OpenJDK `javac`).
 - بناء التحقق: `npm run build`. لم تُطبّق migration أو اختبارات SQL على قاعدة Supabase فعلية في هذه المرحلة.
+
+
+---
+
+## 🔌 المرحلة 10: العمل دون اتصال والمزامنة التلقائية (Offline-First)
+
+- **قاعدة بيانات محلية:** باستخدام مكتبة `Dexie.js` لإدارة IndexedDB في المتصفح وتطبيق الهاتف.
+- **مزامنة تزايدية:** تحديث المنتجات والعملاء والتصنيفات دورياً عبر `updated_at`.
+- **طابور الـ Outbox المحلي:** فواتير البيع دون اتصال تُسجل بمعرف `client_uuid` مع خصم متفائل للمخزون محلياً.
+- **مزامنة متسلسلة تلقائية:** معالجة الفواتير فور عودة الاتصال بأمان تام بفضل خاصية منع التكرار (Idempotency).
+- **كشف التعارض (Conflict Resolution):** فواتير نقص المخزون تُنقل إلى قائمة "تحتاج مراجعة" للمالك لمعالجتها يدوياً.
+- **حماية العمليات الحساسة:** منع تعديل الأسعار، التعطيل، الإلغاء، والتحقق من PIN دون اتصال فعال.
+- **مؤشر دائم وحماية الخروج:** شريط حالة دائم مع زر "مزامنة الآن"، وتحذير صريح عند تسجيل الخروج بوجود فواتير غير مُزامنة.
+- للمزيد من التفاصيل المعمارية: راجع وثيقة [`docs/OFFLINE.md`](docs/OFFLINE.md).
+
+---
+
+## 🚀 المرحلة 11: البناء الآلي والتوزيع (Automated CI/CD & Android Release)
+
+### 1. تشغيل المشروع محلياً (Local Setup)
+
+#### المتطلبات الأساسية:
+- **Node.js** (إصدار 20 LTS أو أحدث) و **npm**.
+- **Java JDK 17 أو 21** (مثل Eclipse Temurin).
+- **Android Studio** (مع تثبيت Android SDK و Build-Tools) في حال الرغبة بتشغيل المحاكي أو فحص ملفات أندرويد محلياً.
+
+#### خطوات التثبيت والتشغيل:
+1. **استنساخ المستودع وتثبيت الاعتمادات:**
+   ```bash
+   git clone https://github.com/albasbasm4-cmd/grocery_ocr_app.git
+   cd grocery_ocr_app
+   npm install
+   ```
+2. **إعداد ملف متغيرات البيئة:**
+   انسخ ملف `.env.example` إلى `.env.local` وعيّن مفاتيح مشروعك العامة:
+   ```bash
+   cp .env.example .env.local
+   ```
+   ضع رابط ومفتاح Anon الخاص بـ Supabase:
+   ```env
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   ```
+3. **تشغيل خادم التطوير للويب:**
+   ```bash
+   npm run dev
+   ```
+4. **فحص الأنواع والاختبارات الآلية:**
+   ```bash
+   npm run lint
+   npm run test
+   ```
+5. **مزامنة كود أندرويد وفتح المشروع في Android Studio:**
+   ```bash
+   npm run build
+   npx cap sync android
+   npx cap open android
+   ```
+
+---
+
+### 2. البناء الآلي عبر GitHub Actions
+
+يحتوي المستودع على اثنين من مسارات العمل (Workflows) الآلية داخل مجلد `.github/workflows/`:
+
+#### أ) مسار فحص الجودة والاختبارات (`ci.yml`):
+- يعمل تلقائياً عند إنشاء أي **Pull Request** إلى فرع `main`.
+- يقوم بفحص الـ TypeScript (`npm run lint`) وبناء الواجهة واختبارات المزامنة المحلية وتصدير كود Java (`npm run test`).
+
+#### ب) مسار بناء ونشر حزم أندرويد (`android-build.yml`):
+- **عند دفع Tag إصدار (مثل `v1.0.0`):**
+  - يبني نسخة الإنتاج الرسمية الموقعة (`Release APK`).
+  - يستخرج `versionName` من اسم الـ Tag (مثلاً `1.0.0`)، ويزيد `versionCode` تلقائياً عبر رقم البناء (`github.run_number`).
+  - يرفع ملف الـ APK كـ Artifact ويُنشئ **GitHub Release** رسمي ويرفق الحزمة تلقائياً.
+- **عند عمل Push لفرع `main`:**
+  - يبني تلقائياً حزمة تجريبية (`Debug APK`) لتجربة الميزات الجديدة ويرفعها كـ Artifact.
+- **التشغيل اليدوي (`workflow_dispatch`):**
+  - يمكنك تشغيل البناء يدوياً من تبويب Actions واختيار نوع البناء (`release` أو `debug`).
+
+---
+
+### 3. دليل توليد مفتاح التوقيع (Keystore) وإعداده في GitHub Secrets
+
+لإصدار نسخ Release موقّعة وجاهزة للتثبيت المباشر على الهواتف، يجب توفير مفتاح توقيع رقمي (Keystore):
+
+#### الخطوة 1: توليد المفتاح محلياً عبر أداة `keytool`
+من سطر الأوامر على جهازك (تأكد من وجود JDK مثبت):
+```bash
+keytool -genkey -v -keystore grocery-pos-release.jks -alias grocery-pos-key -keyalg RSA -keysize 2048 -validity 10000
+```
+- سيطلب منك إدخال كلمة مرور للمفتاح وتأكيدها (احفظها جيداً!).
+- سيطلب بيانات المتجر والاسم، يمكنك تعبئتها أو الضغط على Enter ثم تأكيد الإدخال بـ `yes`.
+
+#### الخطوة 2: تحويل ملف المفتاح إلى نص مشفر بصيغة Base64
+على نظام Linux أو macOS:
+```bash
+base64 -w 0 grocery-pos-release.jks > keystore_base64.txt
+```
+أو على Windows عبر PowerShell:
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("grocery-pos-release.jks")) | Out-File -Encoding ASCII keystore_base64.txt
+```
+
+#### الخطوة 3: إضافة الأسرار إلى مستودع GitHub
+توجه إلى مستودعك في GitHub ثم:
+**Settings** -> **Secrets and variables** -> **Actions** -> اضغط **New repository secret** وأضف الأسرار التالية:
+
+1. `KEYSTORE_BASE64`: الصق النص الكامل الموجود داخل ملف `keystore_base64.txt`.
+2. `KEYSTORE_PASSWORD`: كلمة المرور التي اخترتها للـ Keystore.
+3. `KEY_ALIAS`: اسم المفتاح المستعار (في مثالنا: `grocery-pos-key`).
+4. `KEY_PASSWORD`: كلمة المرور الخاصة بالمفتاح.
+5. `SUPABASE_URL`: رابط مشروع Supabase (مثل `https://xxxx.supabase.co`).
+6. `SUPABASE_ANON_KEY`: مفتاح Supabase Anon العام للعميل.
+
+> ⚠️ **تحذير أمني صارم (Security Best Practices):**
+> - **إياك ورفع ملف الـ Keystore (`grocery-pos-release.jks`) إلى المستودع إطلاقاً!** تأكد من وجوده في `.gitignore`.
+> - **لا تُمرر مفتاح `SUPABASE_SERVICE_ROLE_KEY` أو مفاتيح الذكاء الاصطناعي (`GROQ_API_KEY`, `GEMINI_API_KEY`) إلى بيئة بناء العميل أبداً.** هذه المفاتيح مكانها الوحيد هو Supabase Secrets للـ Edge Functions.
+> - **احفظ نسخة احتياطية آمنة من ملف الـ Keystore وكلمات المرور في مكان موثوق ومحمي:**
+>   إذا فُقد هذا الملف، **فلن تتمكن من تحديث التطبيق على هواتف العملاء أو الكاشير مطلقاً**؛ لأن نظام Android يرفض تثبيت أي تحديث لتطبيق مثبت مسبقاً إذا كان موقّعاً بمفتاح مختلف، وسيتعين على المستخدم حذف التطبيق القديم وفقدان البيانات غير المُزامنة وتثبيت الحزمة الجديدة كلياً.
+
+---
+
+### 4. خطوات تثبيت وتحديث الـ APK على الهاتف المحمول
+
+#### تثبيت التطبيق لأول مرة:
+1. اذهب إلى صفحة **Releases** في مستودع GitHub (أو حمل ملف الـ APK من الـ Artifacts التابعة لأحدث عملية بناء).
+2. حمل ملف `grocery-pos-vX.X.X-release.apk` إلى هاتف أندرويد.
+3. افتح الملف لبدء التثبيت.
+4. إذا ظهرت لك رسالة *"حظر التثبيت من مصادر غير معروفة"*، ادخل إلى إعدادات الهاتف واسمح لمدير الملفات أو المتصفح بتثبيت التطبيقات (Allow from this source).
+5. اضغط **تثبيت (Install)** ثم افتح التطبيق وسجّل الدخول بحساب المتجر.
+
+#### تحديث التطبيق إلى إصدار أحدث:
+- عند صدور إصدار جديد على GitHub، حمل ملف الـ APK الجديد وافتحه مباشرة.
+- سيظهر لك خيار **"تحديث (Update)"** فوق النسخة الحالية دون الحاجة لحذف التطبيق، مع الحفاظ الكامل على الجلسة وبيانات قاعدة البيانات المحلية IndexedDB.
+- شرط نجاح التحديث التلقائي هو أن تكون الحزمتان موقّعتين بنفس الـ Keystore.

@@ -1,0 +1,43 @@
+name: CI / Quality & Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    name: Lint, Typecheck & Automated Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js (with npm cache)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 3. Install Dependencies
+        run: npm ci
+
+      - name: 4. Typecheck (TypeScript)
+        run: npm run lint
+
+      - name: 5. Build Web Assets
+        env:
+          VITE_SUPABASE_URL: "https://ci-test.supabase.co"
+          VITE_SUPABASE_ANON_KEY: "ci-dummy-anon-key-placeholder"
+        run: npm run build
+
+      - name: 6. Setup Java 21 for Java Export Test
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: 7. Run Test Suite (Offline Sync & Java Export)
+        run: npm run test
