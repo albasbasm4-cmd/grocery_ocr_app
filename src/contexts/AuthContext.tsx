@@ -6,11 +6,16 @@ import { isOnline } from '../lib/offlineGuard';
 
 export type StoreRole = 'owner' | 'staff';
 export interface StoreInfo { id: string; name: string; currency_code: string; currency_symbol: string }
-interface AuthContextValue {
+export interface AuthContextValue {
   user: User | null;
   session: Session | null;
   store: StoreInfo | null;
+  activeStore: StoreInfo | null;
+  currentStore: StoreInfo | null;
   role: StoreRole | null;
+  isOwner: boolean;
+  isStaff: boolean;
+  hasActivePinSession: boolean;
   pinExpiresAt: string | null;
   loading: boolean;
   refreshStore: () => Promise<void>;
@@ -73,8 +78,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [session]);
 
+  const isOwner = role === 'owner';
+  const isStaff = role === 'staff';
+  const hasActivePinSession = Boolean(pinExpiresAt && new Date(pinExpiresAt).getTime() > Date.now());
+
   const value = useMemo<AuthContextValue>(() => ({
-    user: session?.user ?? null, session, store, role, pinExpiresAt, loading,
+    user: session?.user ?? null,
+    session,
+    store,
+    activeStore: store,
+    currentStore: store,
+    role,
+    isOwner,
+    isStaff,
+    hasActivePinSession,
+    pinExpiresAt,
+    loading,
     refreshStore,
     setPinExpiresAt: (expires: string | null) => setPinExpiresAt(expires),
     verifyPin: async (pin: string) => {
@@ -96,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut();
       setPinExpiresAt(null);
     },
-  }), [session, store, role, pinExpiresAt, loading, refreshStore]);
+  }), [session, store, role, pinExpiresAt, loading, refreshStore, isOwner, isStaff, hasActivePinSession]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 export function useAuth(): AuthContextValue {

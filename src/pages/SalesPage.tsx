@@ -11,9 +11,23 @@ import { formatCurrencyDisplay } from '../lib/numbers';
 import { fetchSales, fetchSaleDetails } from '../services/salesService';
 import type { SaleWithDetails, SalesFilterOptions } from '../services/salesService';
 import type { PaymentMethod, SaleStatus } from '../types';
+export type DateRange = 'all' | 'today' | 'yesterday' | 'last7days' | 'thisMonth';
+type PaymentFilter = 'all' | 'cash' | 'credit';
+type StatusFilter = 'all' | 'completed' | 'voided';
+
+function isDateRange(v: string): v is DateRange {
+  return ['all', 'today', 'yesterday', 'last7days', 'thisMonth'].includes(v);
+}
+function isPaymentFilter(v: string): v is PaymentFilter {
+  return ['all', 'cash', 'credit'].includes(v);
+}
+function isStatusFilter(v: string): v is StatusFilter {
+  return ['all', 'completed', 'voided'].includes(v);
+}
+
 
 export default function SalesPage() {
-  const auth = useAuth() as any;
+  const auth = useAuth();
   const store = auth.store || auth.currentStore;
   const isOwner = auth.role === 'owner';
   const { numberFormat } = useSettings();
@@ -124,7 +138,7 @@ export default function SalesPage() {
             <button
               key={item.id}
               type="button"
-              onClick={() => setDateRange(item.id as any)}
+              onClick={() => { if (isDateRange(item.id)) setDateRange(item.id); }}
               className={`px-3 py-1.5 rounded-lg font-bold shrink-0 transition ${
                 dateRange === item.id
                   ? 'bg-emerald-600 text-white shadow'
@@ -140,7 +154,7 @@ export default function SalesPage() {
         <div className="grid grid-cols-2 gap-2 text-xs">
           <select
             value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value as any)}
+            onChange={(e) => { const v = e.target.value; if (isPaymentFilter(v)) setPaymentMethod(v); }}
             className="bg-slate-950 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 outline-none focus:border-emerald-500 text-right"
           >
             <option value="all">{ar.allPaymentMethodsOption}</option>
@@ -150,7 +164,7 @@ export default function SalesPage() {
 
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value as any)}
+            onChange={(e) => { const v = e.target.value; if (isStatusFilter(v)) setStatus(v); }}
             className="bg-slate-950 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 outline-none focus:border-emerald-500 text-right"
           >
             <option value="all">{ar.allStatusesOption}</option>

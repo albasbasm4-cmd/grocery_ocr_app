@@ -21,7 +21,7 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({
   sale,
   onSuccess,
 }) => {
-  const { isOwner, hasActivePinSession } = useAuth() as any;
+  const { isOwner, hasActivePinSession } = useAuth();
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -16,7 +16,7 @@ import { fetchCustomers } from '../../src/services/customersService';
 import type { Customer } from '../types';
 
 export default function CustomersPage() {
-  const auth = useAuth() as any;
+  const auth = useAuth();
   const store = auth.store || auth.currentStore;
   const { numberFormat } = useSettings();
   const { showToast } = useToast();

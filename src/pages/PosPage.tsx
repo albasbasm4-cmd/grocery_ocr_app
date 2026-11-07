@@ -21,7 +21,7 @@ import { lookupProductsByCode } from '../services/barcodeLookupService';
 import type { PrintableReceipt, Product, Sale } from '../types';
 
 export default function PosPage() {
-  const auth = useAuth() as any;
+  const auth = useAuth();
   const store = auth.store || auth.currentStore;
   const { numberFormat } = useSettings();
   const { showToast } = useToast();

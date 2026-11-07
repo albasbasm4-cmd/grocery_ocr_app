@@ -27,7 +27,7 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
   numberFormat,
   onSuccess,
 }) => {
-  const { isOwner, hasActivePinSession } = useAuth() as any;
+  const { isOwner, hasActivePinSession } = useAuth();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -5,7 +5,7 @@ import { toLatinDigits } from '../lib/numbers';
 import { normalizeArabic } from '../lib/arabic';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
-import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { fetchProductCosts } from './productsService';
 import { createCategory } from './categoriesService';
 
@@ -779,7 +779,7 @@ export async function exportProductsFile(
         path: fileName,
         data: csvWithBom,
         directory: Directory.Cache,
-        encoding: 'utf8' as any,
+        encoding: Encoding.UTF8,
       });
       await Share.share({
         title: 'تصدير المنتجات CSV',
@@ -838,7 +838,7 @@ export async function exportFullStoreBackup(
       path: fileName,
       data: jsonString,
       directory: Directory.Cache,
-      encoding: 'utf8' as any,
+      encoding: Encoding.UTF8,
     });
     await Share.share({
       title: 'نسخة احتياطية كاملة للمتجر',

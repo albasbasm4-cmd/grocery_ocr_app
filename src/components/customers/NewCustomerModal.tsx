@@ -18,7 +18,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const auth = useAuth() as any;
+  const auth = useAuth();
   const activeStore = auth.store || auth.activeStore;
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');

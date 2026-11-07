@@ -17,7 +17,7 @@ export const PosProductSearch: React.FC<PosProductSearchProps> = ({
   currencySymbol,
   numberFormat,
 }) => {
-  const auth = useAuth() as any;
+  const auth = useAuth();
   const activeStore = auth.store || auth.activeStore;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Product[]>([]);

@@ -32,7 +32,7 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const auth = useAuth() as any;
+  const auth = useAuth();
   const activeStore = auth.store || auth.currentStore;
   const storeId = activeStore?.id;
 

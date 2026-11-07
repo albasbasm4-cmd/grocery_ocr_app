@@ -30,7 +30,7 @@ export const SaleDetailsModal: React.FC<SaleDetailsModalProps> = ({
   numberFormat,
   onUpdated,
 }) => {
-  const { isOwner } = useAuth() as any;
+  const { isOwner } = useAuth();
   const { showToast } = useToast();
 
   const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);

@@ -18,7 +18,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
   numberFormat,
 }) => {
   const { paymentMethod, setPaymentMethod, selectedCustomer, setSelectedCustomer } = useCart();
-  const auth = useAuth() as any;
+  const auth = useAuth();
   const activeStore = auth.store || auth.activeStore;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
