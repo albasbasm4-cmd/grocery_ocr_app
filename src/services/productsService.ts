@@ -243,8 +243,41 @@ export async function updateProduct(
     updates.expiry_date = input.expiry_date || null;
   }
 
+  // الحقول الحساسة (السعر، التكلفة، is_active) تُرسل عبر RPC لأنها تتطلب PIN
+  const sensitiveUpdates: { p_selling_price?: string; p_cost_price?: string; p_is_active?: boolean } = {};
+  if (input.price !== undefined) {
+    sensitiveUpdates.p_selling_price = updates.price as string;
+    delete updates.price;
+  }
+  if (input.cost_price !== undefined) {
+    sensitiveUpdates.p_cost_price = updates.cost_price as string;
+    delete updates.cost_price;
+  }
   if (input.is_active !== undefined) {
-    updates.is_active = input.is_active;
+    sensitiveUpdates.p_is_active = input.is_active;
+  }
+
+  // إذا كانت هناك حقول حساسة، أرسلها عبر RPC
+  if (Object.keys(sensitiveUpdates).length > 0) {
+    const { error: rpcError } = await supabase.rpc('update_product_sensitive', {
+      p_store_id: storeId,
+      p_product_id: productId,
+      ...sensitiveUpdates,
+    });
+    if (rpcError) throw new Error(rpcError.message);
+  }
+
+  // إذا كانت هناك حقول عادية، أرسلها مباشرة
+  if (Object.keys(updates).length === 0 && Object.keys(sensitiveUpdates).length > 0) {
+    // فقط تحديثات حساسة - اجلب المنتج المحدّث
+    const { data: fetchData, error: fetchError } = await supabase
+      .from('products')
+      .select('id, store_id, category_id, name, name_normalized, barcode, sku_small_text, unit, price, stock_quantity, min_stock, expiry_date, is_active, created_at, updated_at')
+      .eq('id', productId)
+      .single();
+    if (fetchError) throw new Error(fetchError.message);
+    await offlineDb.products.put(fetchData as Product).catch(() => undefined);
+    return fetchData as Product;
   }
 
   const { data, error } = await supabase
@@ -267,14 +300,21 @@ export async function updateProduct(
   return data as Product;
 }
 
-export async function setProductActive(productId: string, isActive: boolean): Promise<Product> {
+export async function setProductActive(productId: string, storeId: string, isActive: boolean): Promise<Product> {
   assertOnline(ar.actionOnlineToggleProduct);
+
+  // is_active تُعدَّل عبر RPC لأنها تتطلب PIN
+  const { error: rpcError } = await supabase.rpc('update_product_sensitive', {
+    p_store_id: storeId,
+    p_product_id: productId,
+    p_is_active: isActive,
+  });
+  if (rpcError) throw new Error(rpcError.message);
 
   const { data, error } = await supabase
     .from('products')
-    .update({ is_active: isActive })
-    .eq('id', productId)
     .select('id, store_id, category_id, name, name_normalized, barcode, sku_small_text, unit, price, stock_quantity, min_stock, expiry_date, is_active, created_at, updated_at')
+    .eq('id', productId)
     .single();
 
   if (error) {

@@ -111,7 +111,7 @@ export default function ProductsPage() {
     },
   });
   const activeMutation = useMutation({
-    mutationFn: ({ product, isActive }: { product: Product; isActive: boolean }) => setProductActive(product.id, isActive),
+    mutationFn: ({ product, isActive }: { product: Product; isActive: boolean }) => setProductActive(product.id, product.store_id, isActive),
     onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({ queryKey: ['products', store?.id] });
       showToast(variables.isActive ? ar.activateProduct : ar.deactivateProduct, 'success');
