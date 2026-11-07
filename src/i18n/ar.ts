@@ -178,6 +178,18 @@ export const ar = {
 
   // التقارير
   reportsTitle: 'التقارير والإحصائيات',
+  reports: {
+    subtitle: 'تحليل المبيعات والمخزون والديون', sales: 'المبيعات', excel: 'Excel', csv: 'CSV', pdf: 'PDF', day: 'يوم', period: 'الفترة الزمنية', today: 'اليوم', yesterday: 'أمس', days7: '7 أيام', thisMonth: 'هذا الشهر', custom: 'مخصص', from: 'من', to: 'إلى',
+    refresh: 'تحديث', loading: 'جارٍ تحميل التقارير…', loadError: 'تعذر تحميل التقارير. تحقق من الاتصال ثم أعد المحاولة.',
+    totalSales: 'إجمالي المبيعات', invoiceCount: 'عدد الفواتير', averageInvoice: 'متوسط الفاتورة', lowStock: 'مخزون منخفض', dailySales: 'المبيعات اليومية',
+    noSales: 'لا توجد مبيعات في الفترة المحددة.', mostSold: 'الأكثر مبيعاً', leastMovement: 'الأقل حركة', noData: 'لا توجد بيانات للفترة المحددة.',
+    profitTitle: 'الأرباح من لقطات الفواتير', revenue: 'الإيراد', cost: 'التكلفة', grossProfit: 'الربح الإجمالي', invoices: 'الفواتير', profitByProduct: 'الربح حسب المنتج', profitByCategory: 'الربح حسب التصنيف', inventoryValue: 'قيمة المخزون حسب التصنيف',
+    categoryNone: 'بدون تصنيف', quantity: 'الكمية', minQuantity: 'الحد الأدنى', quantityMin: 'الكمية / الحد الأدنى', noLowStock: 'لا توجد منتجات منخفضة المخزون.',
+    expiry: 'الصلاحية', within: 'خلال', days: 'يوماً', expiredSince: 'منتهي منذ', remaining: 'باقي', noExpiry: 'لا توجد منتجات قريبة من الانتهاء.',
+    stockMovements: 'حركة المخزون', allProducts: 'كل المنتجات', allMovements: 'كل الحركات', sale: 'بيع', return: 'إرجاع', purchase: 'شراء', adjustment: 'تعديل', damage: 'تالف', void: 'إلغاء فاتورة', noMovements: 'لا توجد حركات مخزون في هذه الفترة.',
+    debts: 'ديون العملاء', noDebts: 'لا توجد ديون مستحقة.', exportTitle: 'تصدير ومشاركة التقرير', exportNote: 'تصدير Excel يتضمن الأرباح والتكلفة وقيمة المخزون للمالك فقط.', pdfError: 'تعذر إنشاء أو مشاركة ملف PDF.',
+    csvDate: 'التاريخ', csvInvoiceCount: 'عدد الفواتير', csvSales: 'المبيعات', csvAverage: 'متوسط الفاتورة', csvDiscounts: 'الخصومات',
+  },
   dailySalesTitle: 'المبيعات اليومية',
   profitSummaryTitle: 'ملخص الأرباح والربحية',
   grossProfit: 'إجمالي الربح',

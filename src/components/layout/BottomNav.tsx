@@ -1,12 +1,25 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Home, Package, ShoppingCart, BarChart3, Settings } from 'lucide-react';
-import { usePermissions } from '../../hooks/usePermissions';
 import { ar } from '../../i18n/ar';
 
 export const BottomNav: React.FC = () => {
-  const { isOwner } = usePermissions();
+  const { store } = useAuth();
   const location = useLocation();
+  const { data: lowStockCount = 0 } = useQuery({
+    queryKey: ['nav-low-stock', store?.id],
+    queryFn: async () => {
+      if (!store?.id) return 0;
+      const { data, error } = await supabase.rpc('get_store_alert_counts', { p_store_id: store.id, p_expiry_days: 30 });
+      if (error) throw error;
+      return Number((data as { low_stock_count?: number } | null)?.low_stock_count ?? 0);
+    },
+    enabled: Boolean(store?.id),
+    staleTime: 60_000,
+  });
 
   // إخفاء شريط التنقل السفلي في شاشات تسجيل الدخول والتهيئة
   if (['/login', '/setup', '/reset-password', '/unauthorized'].includes(location.pathname)) {
@@ -58,9 +71,8 @@ export const BottomNav: React.FC = () => {
           <span className="text-[11px] font-bold text-emerald-400 mt-0.5 leading-none">{ar.navPos}</span>
         </NavLink>
 
-        {/* 4. التقارير (مخفية تماماً للموظف) */}
-        {isOwner && (
-          <NavLink
+        {/* 4. التقارير */}
+        <NavLink
             to="/reports"
             className={({ isActive }) =>
               `flex flex-col items-center justify-center min-w-[56px] py-2 transition-colors ${
@@ -68,10 +80,9 @@ export const BottomNav: React.FC = () => {
               }`
             }
           >
-            <BarChart3 className="w-5 h-5 mb-1" />
+            <span className="relative"><BarChart3 className="w-5 h-5 mb-1" />{lowStockCount > 0 && <span className="absolute -left-2 -top-1 min-w-4 rounded-full bg-amber-400 px-1 text-center text-[9px] font-black text-slate-950">{lowStockCount > 99 ? '99+' : lowStockCount}</span>}</span>
             <span className="text-[11px] leading-none">{ar.navReports}</span>
           </NavLink>
-        )}
 
         {/* 5. المزيد / الإعدادات */}
         <NavLink

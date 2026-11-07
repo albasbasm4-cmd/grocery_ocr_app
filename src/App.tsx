@@ -15,11 +15,11 @@ import ChangePinPage from './pages/ChangePinPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import SettingsPage from './pages/SettingsPage';
-import ComingSoonPage from './pages/ComingSoonPage';
 import ProductsPage from './pages/ProductsPage';
 import PosPage from './pages/PosPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SalesPage from './pages/SalesPage';
+import ReportsPage from './pages/ReportsPage';
 import CustomersPage from './pages/CustomersPage';
 import { ar } from './i18n/ar';
 import { supabase } from './lib/supabase';
@@ -70,7 +70,7 @@ function AuthRoutes() {
             <Route path="/staff" element={<StaffManagementPage />} />
             <Route path="/change-pin" element={<ChangePinPage />} />
           </Route>
-          <Route path="/reports" element={<OwnerOnlyRoute />} />
+          <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Route>
@@ -83,12 +83,6 @@ function OwnerCategoriesRoute() {
   const { isOwner } = usePermissions();
   if (!isOwner) return <Navigate to="/unauthorized" replace />;
   return <CategoriesPage />;
-}
-
-function OwnerOnlyRoute() {
-  const { role } = useAuth();
-  if (role !== 'owner') return <Navigate to="/unauthorized" replace />;
-  return <ComingSoonPage />;
 }
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
