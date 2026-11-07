@@ -21,6 +21,8 @@ import CategoriesPage from './pages/CategoriesPage';
 import SalesPage from './pages/SalesPage';
 import ReportsPage from './pages/ReportsPage';
 import CustomersPage from './pages/CustomersPage';
+import AiChatPage from './pages/AiChatPage';
+import JavaExportPage from './pages/JavaExportPage';
 import { ar } from './i18n/ar';
 import { supabase } from './lib/supabase';
 import { useEffect, useState } from 'react';
@@ -66,6 +68,8 @@ function AuthRoutes() {
           <Route path="/pos" element={<PosPage />} />
           <Route path="/sales" element={<SalesPage />} />
           <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/ai-chat" element={<AiChatPage />} />
+          <Route path="/java-export" element={<OwnerJavaExportRoute />} />
           <Route element={<PinProtected />}>
             <Route path="/staff" element={<StaffManagementPage />} />
             <Route path="/change-pin" element={<ChangePinPage />} />
@@ -83,6 +87,12 @@ function OwnerCategoriesRoute() {
   const { isOwner } = usePermissions();
   if (!isOwner) return <Navigate to="/unauthorized" replace />;
   return <CategoriesPage />;
+}
+
+function OwnerJavaExportRoute() {
+  const { isOwner } = usePermissions();
+  if (!isOwner) return <Navigate to="/unauthorized" replace />;
+  return <JavaExportPage />;
 }
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });

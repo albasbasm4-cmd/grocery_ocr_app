@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Link } from 'react-router-dom';
 import { BottomNav } from './BottomNav';
 import { OfflineBanner } from '../ui/OfflineBanner';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAndroidBackButton } from '../../hooks/useAndroidBackButton';
 import { ar } from '../../i18n/ar';
-import { Store, ShieldCheck, Clock } from 'lucide-react';
+import { Store, ShieldCheck, Clock, Bot } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
   const { store, role, pinExpiresAt } = useAuth();
@@ -36,7 +36,7 @@ export const AppLayout: React.FC = () => {
               <Store className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-white leading-tight truncate max-w-[180px] sm:max-w-xs">
+              <h1 className="text-base font-bold text-white leading-tight truncate max-w-[150px] sm:max-w-xs">
                 {store?.name ?? ar.appName}
               </h1>
               <div className="flex items-center gap-1.5 mt-0.5">
@@ -57,16 +57,30 @@ export const AppLayout: React.FC = () => {
             </div>
           </div>
 
-          {/* حالة جلسة PIN للمالك */}
-          {role === 'owner' && remainingSeconds > 0 && (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/30 text-emerald-300 text-xs font-mono">
-              <Clock className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-              <span>
-                {Math.floor(remainingSeconds / 60)}:
-                {String(remainingSeconds % 60).padStart(2, '0')}
+          <div className="flex items-center gap-2">
+            {/* رابط المساعد الذكي */}
+            <Link
+              to="/ai-chat"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-750 text-emerald-400 border border-slate-700/60 transition active:scale-95 flex items-center gap-1.5 shadow-sm"
+              title={ar.aiChatTitle}
+            >
+              <Bot className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-bold text-slate-200 hidden sm:inline">
+                {ar.aiChatTitle}
               </span>
-            </div>
-          )}
+            </Link>
+
+            {/* حالة جلسة PIN للمالك */}
+            {role === 'owner' && remainingSeconds > 0 && (
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-950/80 border border-emerald-500/30 text-emerald-300 text-xs font-mono">
+                <Clock className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+                <span>
+                  {Math.floor(remainingSeconds / 60)}:
+                  {String(remainingSeconds % 60).padStart(2, '0')}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

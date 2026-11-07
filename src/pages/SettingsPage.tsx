@@ -17,6 +17,8 @@ import {
   Smartphone,
   Shield,
   Check,
+  Bot,
+  FileCode2,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -193,6 +195,38 @@ export default function SettingsPage() {
               {formatCurrency(149.75, displayCurrencySymbol)}
             </span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* أدوات الذكاء الاصطناعي والتصدير البرمجي */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+              <Bot className="w-5 h-5" />
+            </div>
+            <CardTitle>{ar.aiChatTitle}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Button
+            variant="outline"
+            className="w-full justify-between"
+            onClick={() => navigate('/ai-chat')}
+            icon={<Bot className="w-4 h-4 text-emerald-400" />}
+          >
+            <span>{ar.aiChatTitle}</span>
+          </Button>
+          {isOwner && (
+            <Button
+              variant="outline"
+              className="w-full justify-between"
+              onClick={() => navigate('/java-export')}
+              icon={<FileCode2 className="w-4 h-4 text-indigo-400" />}
+            >
+              <span>{ar.javaExportTitle}</span>
+            </Button>
+          )}
         </CardContent>
       </Card>
 

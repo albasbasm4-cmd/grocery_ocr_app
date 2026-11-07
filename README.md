@@ -325,3 +325,14 @@ npm run cap:android
 التشغيل: طبّق migration `supabase/migrations/20261107000013_phase8_reports.sql` على قاعدة Supabase، ثم نفّذ `npm run build`. اختبارات SQL للمرحلة: `supabase/tests/phase8_reports_test.sql`.
 
 ملاحظة: صلاحيات قاعدة البيانات واختبارات SQL يجب التحقق منها على قاعدة Supabase محلية/اختبارية قبل النشر.
+
+
+## المرحلة 9: المساعد الذكي وتصدير Java
+
+- صفحة `/ai-chat` تقدم محادثة عربية، أسئلة جاهزة، عرض حالة الكتابة ورسائل الأخطاء. ترسل الرسالة إلى Supabase Edge Function `ai-chat` فقط؛ لا يتصل المتصفح بمزود النموذج مباشرة.
+- وظيفة `ai-chat` تتحقق من JWT وعضوية المتجر ودور العضو، وتطبق حد 20 طلباً في الدقيقة لكل مستخدم/متجر، وتستخدم استعلامات RPC محددة للقراءة فقط. سجل المحادثة لا يُقبل من العميل لتقليل حقن السياق. بيانات التكلفة والأرباح لا تعاد للموظف من دوال SQL.
+- أضف `GROQ_API_KEY` أو `GEMINI_API_KEY` إلى Supabase Secrets من لوحة التحكم/CLI الآمن. لا تضع هذه الأسرار في `.env` أو GitHub أو كود الواجهة. وظيفة Edge تستخدم Groq عند وجوده ثم Gemini عند عدم وجود Groq.
+- تطبيق قاعدة البيانات: شغّل migrations بحسب الترتيب، بما فيها `20261107000014_phase9_ai_chat_and_tools.sql`، ثم اختبر `supabase/tests/phase9_ai_tools_test.sql` بعد تجهيز مستخدمين ومتاجر اختبار في بيئة محلية مهيأة.
+- شاشة `/java-export` متاحة للمالك فقط. تولّد `ProductRepository.java` وداخلها `Product`، تستخدم `BigDecimal` للقيم، وتهرّب النصوص؛ يتاح نسخ الكود وتنزيله ومشاركته.
+- اختبار ترجمة وتوليد Java: `npx tsx tests/javaExportCompileTest.ts` (يتطلب Node وNix/OpenJDK `javac`).
+- بناء التحقق: `npm run build`. لم تُطبّق migration أو اختبارات SQL على قاعدة Supabase فعلية في هذه المرحلة.

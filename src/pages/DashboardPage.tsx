@@ -18,6 +18,8 @@ import {
   PackageOpen,
   BarChart3,
   ArrowRight,
+  Bot,
+  FileCode2,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -285,6 +287,28 @@ export default function DashboardPage() {
             </div>
             <span className="text-xs font-bold leading-tight">{ar.checkLowStock}</span>
           </Link>
+
+          <Link
+            to="/ai-chat"
+            className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700/60 transition active:scale-[0.98]"
+          >
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0">
+              <Bot className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-bold leading-tight">{ar.aiChatTitle}</span>
+          </Link>
+
+          {isOwner && (
+            <Link
+              to="/java-export"
+              className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700/60 transition active:scale-[0.98]"
+            >
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
+                <FileCode2 className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-bold leading-tight">{ar.javaExportTitle}</span>
+            </Link>
+          )}
 
           {isOwner && (
             <Link
