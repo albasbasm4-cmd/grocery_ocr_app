@@ -10,7 +10,8 @@ import {
   Store,
   Binary,
   KeyRound,
-  Users, Receipt,
+  Users,
+  Receipt,
   Download,
   LogOut,
   Smartphone,
@@ -20,6 +21,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
+import { FullBackupModal } from '../components/settings/FullBackupModal';
 
 export default function SettingsPage() {
   const { store, signOut, refreshStore } = useAuth();
@@ -28,7 +30,7 @@ export default function SettingsPage() {
   const { success, error } = useToast();
   const navigate = useNavigate();
 
-  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [backupModalOpen, setBackupModalOpen] = useState<boolean>(false);
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
   const [storeName, setStoreName] = useState('');
   const [currencyCode, setCurrencyCode] = useState('');
@@ -41,60 +43,19 @@ export default function SettingsPage() {
     setCurrencySymbol(store?.currency_symbol ?? '');
   }, [store]);
 
-  // تصدير نسخة احتياطية بصيغة JSON
-  const handleExportBackup = async () => {
-    if (!store?.id) return;
-    try {
-      setIsExporting(true);
-
-      const [categoriesRes, productsRes, customersRes] = await Promise.all([
-        supabase.from('categories').select('*').eq('store_id', store.id),
-        supabase.from('products').select('*').eq('store_id', store.id),
-        supabase.from('customers').select('*').eq('store_id', store.id),
-      ]);
-
-      const backupData = {
-        exported_at: new Date().toISOString(),
-        store: {
-          id: store.id,
-          name: store.name,
-          currency_code: store.currency_code,
-          currency_symbol: store.currency_symbol,
-        },
-        categories: categoriesRes.data || [],
-        products: productsRes.data || [],
-        customers: customersRes.data || [],
-      };
-
-      const jsonStr = JSON.stringify(backupData, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const sanitizedName = (store.name || 'store').replace(/[^a-zA-Z0-9_؀-ۿ]/g, '_');
-      a.href = url;
-      a.download = `backup_${sanitizedName}_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      success(ar.exportSuccess);
-    } catch (err) {
-      console.error('Export failed:', err);
-      error(ar.exportFailed);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   const handleSaveStore = async () => {
     if (!store?.id || !isOwner) return;
     setIsSavingStore(true);
     const { error: updateError } = await supabase.from('stores').update({
-      name: storeName.trim(), currency_code: currencyCode.trim().toUpperCase(), currency_symbol: currencySymbol.trim(),
+      name: storeName.trim(),
+      currency_code: currencyCode.trim().toUpperCase(),
+      currency_symbol: currencySymbol.trim(),
     }).eq('id', store.id);
     setIsSavingStore(false);
-    if (updateError) { error(ar.storeSaveFailed); return; }
+    if (updateError) {
+      error(ar.storeSaveFailed);
+      return;
+    }
     await refreshStore();
     success(ar.storeSaved);
   };
@@ -108,7 +69,7 @@ export default function SettingsPage() {
   const displayCurrencySymbol = store?.currency_symbol || 'ر.س';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" dir="rtl">
       {/* 1. بيانات المتجر والعملة */}
       <Card>
         <CardHeader>
@@ -120,27 +81,60 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {isOwner ? <>
-            <label className="block text-xs font-semibold text-slate-300">{ar.storeNameLabel}
-              <input className="field mt-1" value={storeName} onChange={(event) => setStoreName(event.target.value)} maxLength={100} />
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-xs font-semibold text-slate-300">{ar.currencyCodeLabel}
-                <input className="field mt-1 text-left" dir="ltr" value={currencyCode} onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())} maxLength={3} />
+          {isOwner ? (
+            <>
+              <label className="block text-xs font-semibold text-slate-300">
+                {ar.storeNameLabel}
+                <input
+                  className="field mt-1"
+                  value={storeName}
+                  onChange={(event) => setStoreName(event.target.value)}
+                  maxLength={100}
+                />
               </label>
-              <label className="block text-xs font-semibold text-slate-300">{ar.currencyLabel}
-                <input className="field mt-1" value={currencySymbol} onChange={(event) => setCurrencySymbol(event.target.value)} maxLength={10} />
-              </label>
-            </div>
-            <Button className="w-full" onClick={() => void handleSaveStore()} isLoading={isSavingStore}>{ar.save}</Button>
-          </> : <>
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-sm">
-              <span className="text-slate-400">{ar.storeNameLabel}</span><span className="font-bold text-white">{store?.name || '—'}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-sm">
-              <span className="text-slate-400">{ar.currencyLabel}</span><span className="font-bold text-emerald-400">{store?.currency_code || 'SAR'} ({store?.currency_symbol || 'ر.س'})</span>
-            </div>
-          </>}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-xs font-semibold text-slate-300">
+                  {ar.currencyCodeLabel}
+                  <input
+                    className="field mt-1 text-left"
+                    dir="ltr"
+                    value={currencyCode}
+                    onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())}
+                    maxLength={3}
+                  />
+                </label>
+                <label className="block text-xs font-semibold text-slate-300">
+                  {ar.currencyLabel}
+                  <input
+                    className="field mt-1"
+                    value={currencySymbol}
+                    onChange={(event) => setCurrencySymbol(event.target.value)}
+                    maxLength={10}
+                  />
+                </label>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => void handleSaveStore()}
+                isLoading={isSavingStore}
+              >
+                {ar.save}
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-sm">
+                <span className="text-slate-400">{ar.storeNameLabel}</span>
+                <span className="font-bold text-white">{store?.name || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-sm">
+                <span className="text-slate-400">{ar.currencyLabel}</span>
+                <span className="font-bold text-emerald-400">
+                  {store?.currency_code || 'SAR'} ({store?.currency_symbol || 'ر.س'})
+                </span>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -202,7 +196,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-            {/* إدارة المبيعات والفواتير والعملاء */}
+      {/* إدارة المبيعات والفواتير والعملاء */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -267,30 +261,31 @@ export default function SettingsPage() {
       )}
 
       {/* 4. النسخ الاحتياطي وتصدير البيانات */}
-      {isOwner && <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
-              <Download className="w-5 h-5" />
+      {isOwner && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+                <Download className="w-5 h-5" />
+              </div>
+              <div>
+                <CardTitle>{ar.dataManagement}</CardTitle>
+                <p className="text-xs text-slate-400 mt-0.5">{ar.exportBackupDesc}</p>
+              </div>
             </div>
-            <div>
-              <CardTitle>{ar.dataManagement}</CardTitle>
-              <p className="text-xs text-slate-400 mt-0.5">{ar.exportBackupDesc}</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Button
-            variant="secondary"
-            className="w-full"
-            onClick={() => void handleExportBackup()}
-            isLoading={isExporting}
-            icon={<Download className="w-4 h-4 text-indigo-400" />}
-          >
-            {ar.exportBackup}
-          </Button>
-        </CardContent>
-      </Card>}
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => setBackupModalOpen(true)}
+              icon={<Download className="w-4 h-4 text-indigo-400" />}
+            >
+              {ar.exportBackup}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 5. معلومات التطبيق ونظام أندرويد */}
       <Card className="bg-slate-950/40 border-slate-800/80">
@@ -338,6 +333,14 @@ export default function SettingsPage() {
           {ar.signOutConfirmBody}
         </p>
       </Modal>
+
+      {/* نافذة النسخ الاحتياطي الكامل */}
+      <FullBackupModal
+        isOpen={backupModalOpen}
+        onClose={() => setBackupModalOpen(false)}
+        storeId={store?.id || ''}
+        storeName={store?.name || 'store'}
+      />
     </div>
   );
 }

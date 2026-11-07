@@ -1,3 +1,6 @@
+import { ImportProductsModal } from '../components/products/ImportProductsModal';
+import { ExportProductsModal } from '../components/products/ExportProductsModal';
+import { Upload, Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ChevronDown, Eye, FolderTree, PackagePlus, Pencil, Search, SlidersHorizontal, Warehouse } from 'lucide-react';
@@ -51,6 +54,8 @@ export default function ProductsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
@@ -200,10 +205,43 @@ export default function ProductsPage() {
           <h1 className="text-xl font-extrabold text-white">{ar.productsTitle}</h1>
           <p className="mt-1 text-xs text-slate-400">{products.length}</p>
         </div>
-        <div className="flex gap-2">
-          {isOwner && <Link to="/categories" aria-label={ar.manageCategories} className="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm font-bold text-slate-200"><FolderTree className="h-4 w-4" /><span className="hidden sm:inline">{ar.manageCategories}</span></Link>}
-          <Button variant="outline" icon={<ScanLine className="h-4 w-4" />} onClick={() => setScannerOpen(true)}>{ar.scanProduct}</Button>
-          {isOwner && <Button icon={<PackagePlus className="h-4 w-4" />} onClick={openCreate}>{ar.addNewProduct}</Button>}
+        <div className="flex flex-wrap items-center gap-2">
+          {isOwner && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Upload className="h-4 w-4" />}
+              onClick={() => setImportOpen(true)}
+            >
+              <span className="hidden sm:inline">{ar.importProducts}</span>
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            icon={<Download className="h-4 w-4" />}
+            onClick={() => setExportOpen(true)}
+          >
+            <span className="hidden sm:inline">{ar.exportProducts}</span>
+          </Button>
+          {isOwner && (
+            <Link
+              to="/categories"
+              aria-label={ar.manageCategories}
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-slate-700 px-3 text-xs font-bold text-slate-200"
+            >
+              <FolderTree className="h-4 w-4" />
+              <span className="hidden md:inline">{ar.manageCategories}</span>
+            </Link>
+          )}
+          <Button variant="outline" size="sm" icon={<ScanLine className="h-4 w-4" />} onClick={() => setScannerOpen(true)}>
+            {ar.scanProduct}
+          </Button>
+          {isOwner && (
+            <Button size="sm" icon={<PackagePlus className="h-4 w-4" />} onClick={openCreate}>
+              {ar.addNewProduct}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -285,6 +323,27 @@ export default function ProductsPage() {
         setPinOpen(true);
       }} />
       <PinPromptModal isOpen={pinOpen} onClose={() => { setPinOpen(false); setFormDraft(null); setActionProduct(null); setNextActiveState(null); setPendingAction(null); setPendingStock(null); }} onSuccess={onPinSuccess} />
+
+      {isOwner && (
+        <ImportProductsModal
+          isOpen={importOpen}
+          onClose={() => setImportOpen(false)}
+          storeId={store?.id || ''}
+          onSuccess={() => {
+            void queryClient.invalidateQueries({ queryKey: ['products'] });
+            showToast('تم استيراد المنتجات بنجاح.', 'success');
+          }}
+        />
+      )}
+
+      <ExportProductsModal
+        isOpen={exportOpen}
+        onClose={() => setExportOpen(false)}
+        storeId={store?.id || ''}
+        storeName={store?.name || 'store'}
+        initialCategoryId={categoryId || null}
+        categories={categories}
+      />
     </div>
   );
 }
