@@ -64,6 +64,12 @@
 │   │   ├── concurrency_sales_test.sh
 │   │   └── concurrency_sales_test.sql
 │   └── config.toml           # إعدادات بيئة Supabase المحلية
+├── tests/                    # حزم الاختبارات المؤتمتة والشاملة
+│   ├── financialPrecisionTest.ts   # اختبارات الدقة المالية الصارمة (0.1+0.2، والكسور، والأوزان)
+│   ├── javaExportCompileTest.ts    # اختبار توليد وترجمة كود Java
+│   ├── offlineSyncTest.ts          # اختبارات العمل دون اتصال والمزامنة
+│   ├── performanceTest.ts          # اختبار الأداء وقابلية التوسع (10,000 منتج)
+│   └── salesAndReturnsTest.ts      # اختبارات مسارات البيع والإرجاع والأمان المالي
 ├── .env.example              # نموذج متغيرات البيئة الآمنة
 ├── package.json              # الاعتماديات وأوامر التشغيل
 ├── tailwind.config.js        # إعدادات Tailwind والخطوط

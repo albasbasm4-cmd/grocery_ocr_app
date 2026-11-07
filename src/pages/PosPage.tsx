@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { useState, useEffect } from 'react';
 import { ScanLine, ShoppingBasket, Trash2, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -105,7 +106,7 @@ export default function PosPage() {
         clientUuid,
         items: items.map((i) => ({
           product_id: i.product.id,
-          quantity: Number(i.quantity),
+          quantity: new Decimal(i.quantity).toString(),
         })),
         discountAmount,
         paymentMethod,
@@ -161,7 +162,7 @@ export default function PosPage() {
           name: i.product.name,
           quantity: i.quantity,
           unitPrice: i.product.price,
-          lineTotal: (Number(i.quantity) * Number(i.product.price)).toFixed(2),
+          lineTotal: new Decimal(i.quantity).times(new Decimal(i.product.price)).toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toFixed(2),
           unit: i.product.unit,
         })),
         subtotal,

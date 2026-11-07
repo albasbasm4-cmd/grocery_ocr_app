@@ -3,7 +3,7 @@ import type { Category, Customer, PaymentMethod, Product } from '../types';
 
 export interface OutboxSaleItem {
   product_id: string;
-  quantity: number;
+  quantity: number | string;
   product_name_snapshot?: string;
   unit_price_snapshot?: string;
 }

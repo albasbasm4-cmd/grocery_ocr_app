@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -135,7 +136,7 @@ export async function renderReceiptCanvas(receipt: PrintableReceipt): Promise<HT
   y += 24;
 
   // الخصم
-  if (Number(receipt.discountAmount) > 0) {
+  if (new Decimal(receipt.discountAmount || '0').greaterThan(0)) {
     ctx.fillStyle = '#dc2626';
     ctx.textAlign = 'right';
     ctx.fillText('الخصم:', width - 28, y);

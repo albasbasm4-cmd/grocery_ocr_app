@@ -6,7 +6,7 @@ import { ar } from '../i18n/ar';
 
 export interface ProcessSaleItemPayload {
   product_id: string;
-  quantity: number;
+  quantity: number | string;
 }
 
 export interface ProcessSaleInput {
@@ -55,7 +55,7 @@ export async function processSale(input: ProcessSaleInput): Promise<ProcessSaleR
     p_store_id: input.storeId,
     p_client_uuid: input.clientUuid,
     p_items: input.items,
-    p_discount_amount: discountDec.toNumber(),
+    p_discount_amount: discountDec.toFixed(2),
     p_payment_method: input.paymentMethod,
     p_customer_id: input.customerId || null,
   });
@@ -198,6 +198,6 @@ export async function returnItems(
 
   if (error) throw new Error(error.message);
   return {
-    totalRefundAmount: Number(data?.total_refund_amount ?? 0),
+    totalRefundAmount: new Decimal(data?.total_refund_amount ?? 0).toNumber(),
   };
 }
