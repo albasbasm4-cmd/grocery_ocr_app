@@ -51,6 +51,32 @@ export async function lookupProductsByCode(storeId: string, value: string): Prom
 
 async function lookupProductsOffline(storeId: string, code: string, normalized: string): Promise<Product[]> {
   try {
+    // 1. تسريع البحث المباشر للباركود عبر فهرس Dexie (O(1))
+    if (code) {
+      const exactBarcode = await offlineDb.products.where('barcode').equals(code).first();
+      if (exactBarcode && exactBarcode.store_id === storeId && exactBarcode.is_active) {
+        return [exactBarcode];
+      }
+      const exactSku = await offlineDb.products.where('sku_small_text').equals(code).first();
+      if (exactSku && exactSku.store_id === storeId && exactSku.is_active) {
+        return [exactSku];
+      }
+    }
+
+    // 2. تسريع البحث النصي بالبادئة عبر فهرس name_normalized
+    if (normalized.length >= 2) {
+      const prefixMatches = await offlineDb.products
+        .where('name_normalized')
+        .startsWith(normalized)
+        .filter((p) => p.store_id === storeId && p.is_active)
+        .limit(10)
+        .toArray();
+      if (prefixMatches.length > 0) {
+        return prefixMatches;
+      }
+    }
+
+    // 3. مسح مرن للأجزاء المطابقة
     const allStoreProducts = await offlineDb.products
       .where('store_id')
       .equals(storeId)
