@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "cap:sync": "npm run build && cap sync",
     "cap:android": "cap open android",
-    "test:java-export": "tsx tests/javaExportCompileTest.ts"
+    "test:java-export": "tsx tests/javaExportCompileTest.ts",
+    "test:offline": "tsx tests/offlineSyncTest.ts",
+    "test": "npm run test:offline && npm run test:java-export"
   },
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^8.2.2",
@@ -27,6 +29,7 @@
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
     "decimal.js": "^10.4.3",
+    "dexie": "^4.4.7",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
@@ -43,6 +46,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "fake-indexeddb": "^6.2.7",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "tsx": "^4.23.15",

@@ -21,6 +21,7 @@ import { compareArabic, sortArabic } from '../lib/arabic';
 import Decimal from 'decimal.js';
 import { useSettings } from '../contexts/SettingsContext';
 import { toLatinDigits } from '../lib/numbers';
+import { ensureOnlineWithToast } from '../lib/offlineGuard';
 import { ar } from '../i18n/ar';
 import { fetchCategories } from '../services/categoriesService';
 import { adjustProductStockRpc, createProduct, fetchProductCosts, fetchProducts, setProductActive, updateProduct, type ProductInput } from '../services/productsService';
@@ -126,10 +127,12 @@ export default function ProductsPage() {
   });
 
   const openCreate = () => {
+    if (!ensureOnlineWithToast('إضافة منتج جديد', showToast)) return;
     setEditingProduct(null);
     setFormOpen(true);
   };
   const openEdit = (product: Product) => {
+    if (!ensureOnlineWithToast('تعديل بيانات المنتج وسعر البيع', showToast)) return;
     setEditingProduct(product);
     setFormOpen(true);
   };
@@ -146,11 +149,13 @@ export default function ProductsPage() {
     setEditingProduct(null);
   };
   const requestProductStateChange = (product: Product) => {
+    if (!ensureOnlineWithToast('تعطيل أو تفعيل المنتج', showToast)) return;
     setActionProduct(product);
     setNextActiveState(!product.is_active);
     setPinOpen(true);
   };
   const requestStockAdjustment = (product: Product) => {
+    if (!ensureOnlineWithToast('تسوية المخزون يدوياً', showToast)) return;
     setStockProduct(product);
   };
   const loadMore = productsQuery.hasNextPage && !productsQuery.isFetchingNextPage;

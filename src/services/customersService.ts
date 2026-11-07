@@ -1,6 +1,8 @@
 import Decimal from 'decimal.js';
 import { supabase } from '../lib/supabase';
 import type { Customer, CustomerPayment, Sale } from '../types';
+import { offlineDb } from '../lib/offlineDb';
+import { isOnline, assertOnline } from '../lib/offlineGuard';
 
 export interface CreateCustomerInput {
   storeId: string;
@@ -9,24 +11,59 @@ export interface CreateCustomerInput {
 }
 
 export async function fetchCustomers(storeId: string, search = ''): Promise<Customer[]> {
-  let query = supabase
-    .from('customers')
-    .select('id, store_id, name, phone, balance, created_at')
-    .eq('store_id', storeId)
-    .order('name');
-
   const trimmed = search.trim();
-  if (trimmed) {
-    const escaped = trimmed.replace(/[\\%_]/g, (char) => `\\${char}`);
-    query = query.or(`name.ilike.%${escaped}%,phone.ilike.%${escaped}%`);
+
+  if (!isOnline()) {
+    try {
+      const locals = await offlineDb.customers.where('store_id').equals(storeId).toArray();
+      if (!trimmed) return locals;
+      const lower = trimmed.toLowerCase();
+      return locals.filter(
+        (c) => c.name.toLowerCase().includes(lower) || (c.phone && c.phone.includes(trimmed))
+      );
+    } catch {
+      return [];
+    }
   }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Customer[];
+  try {
+    let query = supabase
+      .from('customers')
+      .select('id, store_id, name, phone, balance, created_at')
+      .eq('store_id', storeId)
+      .order('name');
+
+    if (trimmed) {
+      const escaped = trimmed.replace(/[\\%_]/g, (char) => `\\${char}`);
+      query = query.or(`name.ilike.%${escaped}%,phone.ilike.%${escaped}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    const customers = (data ?? []) as Customer[];
+    await offlineDb.customers.bulkPut(customers).catch(() => undefined);
+    return customers;
+  } catch (err) {
+    try {
+      const locals = await offlineDb.customers.where('store_id').equals(storeId).toArray();
+      if (!trimmed) return locals;
+      const lower = trimmed.toLowerCase();
+      return locals.filter(
+        (c) => c.name.toLowerCase().includes(lower) || (c.phone && c.phone.includes(trimmed))
+      );
+    } catch {
+      return [];
+    }
+  }
 }
 
 export async function fetchCustomerById(customerId: string): Promise<Customer | null> {
+  if (!isOnline()) {
+    const local = await offlineDb.customers.get(customerId);
+    return local || null;
+  }
+
   const { data, error } = await supabase
     .from('customers')
     .select('id, store_id, name, phone, balance, created_at')
@@ -35,12 +72,16 @@ export async function fetchCustomerById(customerId: string): Promise<Customer | 
 
   if (error) {
     if (error.code === 'PGRST116') return null;
+    const local = await offlineDb.customers.get(customerId);
+    if (local) return local;
     throw new Error(error.message);
   }
   return data as Customer;
 }
 
 export async function createCustomer(input: CreateCustomerInput): Promise<Customer> {
+  assertOnline('إضافة عميل جديد');
+
   const cleanName = input.name.trim();
   if (!cleanName) throw new Error('اسم العميل مطلوب.');
 
@@ -57,6 +98,9 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Custom
     .single();
 
   if (error) throw new Error(error.message);
+
+  await offlineDb.customers.put(data as Customer).catch(() => undefined);
+
   return data as Customer;
 }
 
@@ -83,6 +127,8 @@ export async function fetchCustomerPayments(customerId: string): Promise<Custome
 }
 
 export async function recordCustomerPayment(customerId: string, amount: string): Promise<CustomerPayment> {
+  assertOnline('تسجيل سداد دفعة للعميل');
+
   const decAmount = new Decimal(amount.trim() || '0');
   if (!decAmount.isFinite() || decAmount.lessThanOrEqualTo(0)) {
     throw new Error('مبلغ السداد يجب أن يكون أكبر من الصفر.');

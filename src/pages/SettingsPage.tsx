@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getOutboxStats, processOutbox, syncLocalData } from '../services/offlineSyncService';
 import { usePermissions } from '../hooks/usePermissions';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
@@ -34,6 +35,8 @@ export default function SettingsPage() {
 
   const [backupModalOpen, setBackupModalOpen] = useState<boolean>(false);
   const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
+  const [pendingSalesCount, setPendingSalesCount] = useState<number>(0);
+  const [isSyncingBeforeLogout, setIsSyncingBeforeLogout] = useState<boolean>(false);
   const [storeName, setStoreName] = useState('');
   const [currencyCode, setCurrencyCode] = useState('');
   const [currencySymbol, setCurrencySymbol] = useState('');
@@ -340,7 +343,13 @@ export default function SettingsPage() {
       <Button
         variant="danger"
         className="w-full"
-        onClick={() => setShowLogoutModal(true)}
+        onClick={async () => {
+          if (store?.id) {
+            const stats = await getOutboxStats(store.id);
+            setPendingSalesCount(stats.pendingCount + stats.needsReviewCount + stats.syncingCount);
+          }
+          setShowLogoutModal(true);
+        }}
         icon={<LogOut className="w-4 h-4" />}
       >
         {ar.signOut}
@@ -363,9 +372,50 @@ export default function SettingsPage() {
           </>
         }
       >
-        <p className="text-sm text-slate-300">
-          {ar.signOutConfirmBody}
-        </p>
+        {pendingSalesCount > 0 ? (
+          <div className="space-y-3">
+            <div className="p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-amber-200 text-xs leading-relaxed space-y-1.5">
+              <div className="font-bold flex items-center gap-1.5 text-amber-300 text-sm">
+                <span>⚠️ تحذير: فواتير غير مُزامنة!</span>
+              </div>
+              <p>
+                توجد <span className="font-extrabold underline">{pendingSalesCount}</span> عملية بيع محفوظة محلياً ولم تتم مزامنتها مع الخادم بعد.
+              </p>
+              <p className="text-slate-300">
+                تسجيل الخروج الآن لن يحذف هذه البيانات من جهازك، لكن لن تظهر في تقارير الخادم حتى تتم المزامنة. يفضل المزامنة أولاً قبل الخروج.
+              </p>
+            </div>
+            {navigator.onLine && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isSyncingBeforeLogout}
+                className="w-full text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 text-xs"
+                onClick={async () => {
+                  if (!store?.id) return;
+                  setIsSyncingBeforeLogout(true);
+                  try {
+                    await syncLocalData(store.id);
+                    await processOutbox(store.id);
+                    const stats = await getOutboxStats(store.id);
+                    setPendingSalesCount(stats.pendingCount + stats.needsReviewCount + stats.syncingCount);
+                  } finally {
+                    setIsSyncingBeforeLogout(false);
+                  }
+                }}
+              >
+                {isSyncingBeforeLogout ? 'جارٍ المزامنة...' : '🔄 مزامنة الفواتير الآن قبل الخروج'}
+              </Button>
+            )}
+            <p className="text-xs text-slate-400">
+              {ar.signOutConfirmBody}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-300">
+            {ar.signOutConfirmBody}
+          </p>
+        )}
       </Modal>
 
       {/* نافذة النسخ الاحتياطي الكامل */}

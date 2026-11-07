@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { Category } from '../types';
 import { normalizeArabic } from '../lib/arabic';
+import { offlineDb } from '../lib/offlineDb';
+import { isOnline, assertOnline } from '../lib/offlineGuard';
 
 export const DEFAULT_SUGGESTED_CATEGORIES = [
   'ألبان',
@@ -13,20 +15,36 @@ export const DEFAULT_SUGGESTED_CATEGORIES = [
 ];
 
 export async function fetchCategories(storeId: string): Promise<Category[]> {
-  const { data, error } = await supabase
-    .from('categories')
-    .select('id, store_id, name, name_normalized, created_at')
-    .eq('store_id', storeId)
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    throw new Error(error.message);
+  if (!isOnline()) {
+    try {
+      return await offlineDb.categories.where('store_id').equals(storeId).toArray();
+    } catch {
+      return [];
+    }
   }
 
-  return (data || []) as Category[];
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, store_id, name, name_normalized, created_at')
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const categories = (data || []) as Category[];
+    await offlineDb.categories.bulkPut(categories).catch(() => undefined);
+    return categories;
+  } catch (err) {
+    return await offlineDb.categories.where('store_id').equals(storeId).toArray().catch(() => []);
+  }
 }
 
 export async function createCategory(storeId: string, name: string): Promise<Category> {
+  assertOnline('إضافة تصنيف جديد');
+
   const trimmed = name.trim();
   if (!trimmed) {
     throw new Error('اسم التصنيف مطلوب');
@@ -49,10 +67,14 @@ export async function createCategory(storeId: string, name: string): Promise<Cat
     throw new Error(error.message);
   }
 
+  await offlineDb.categories.put(data as Category).catch(() => undefined);
+
   return data as Category;
 }
 
 export async function updateCategory(categoryId: string, name: string): Promise<Category> {
+  assertOnline('تعديل اسم التصنيف');
+
   const trimmed = name.trim();
   if (!trimmed) {
     throw new Error('اسم التصنيف مطلوب');
@@ -75,6 +97,8 @@ export async function updateCategory(categoryId: string, name: string): Promise<
     throw new Error(error.message);
   }
 
+  await offlineDb.categories.put(data as Category).catch(() => undefined);
+
   return data as Category;
 }
 
@@ -95,6 +119,8 @@ export async function deleteCategory(
   categoryId: string,
   targetCategoryIdToMove?: string
 ): Promise<void> {
+  assertOnline('حذف التصنيف');
+
   // إذا طُلب نقل المنتجات أولاً إلى تصنيف آخر
   if (targetCategoryIdToMove) {
     const { error: moveError } = await supabase
@@ -120,9 +146,13 @@ export async function deleteCategory(
   if (error) {
     throw new Error(error.message);
   }
+
+  await offlineDb.categories.delete(categoryId).catch(() => undefined);
 }
 
 export async function seedDefaultCategories(storeId: string): Promise<Category[]> {
+  assertOnline('تهيئة التصنيفات الافتراضية');
+
   const rows = DEFAULT_SUGGESTED_CATEGORIES.map((name) => ({
     store_id: storeId,
     name,

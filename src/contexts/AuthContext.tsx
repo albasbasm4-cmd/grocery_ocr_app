@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { isOnline } from '../lib/offlineGuard';
 
 export type StoreRole = 'owner' | 'staff';
 export interface StoreInfo { id: string; name: string; currency_code: string; currency_symbol: string }
@@ -76,6 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshStore,
     setPinExpiresAt: (expires: string | null) => setPinExpiresAt(expires),
     verifyPin: async (pin: string) => {
+      if (!isOnline()) {
+        return {
+          success: false,
+          error: 'التحقق من رمز PIN يتطلب اتصالاً فعالاً بالإنترنت لحماية أمان المتجر.',
+        };
+      }
       if (!store) return { success: false, error: 'المتجر غير موجود.' };
       const { data, error } = await supabase.rpc('verify_admin_pin', { p_store_id: store.id, p_pin: pin });
       if (error) return { success: false, error: error.message };
@@ -84,7 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPinExpiresAt(result.expires_at);
       return { success: true };
     },
-    signOut: async () => { await supabase.auth.signOut(); setPinExpiresAt(null); },
+    signOut: async () => {
+      await supabase.auth.signOut();
+      setPinExpiresAt(null);
+    },
   }), [session, store, role, pinExpiresAt, loading, refreshStore]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ScanLine, ShoppingBasket, Trash2, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -15,8 +15,10 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ar } from '../i18n/ar';
 import { formatCurrencyDisplay } from '../lib/numbers';
 import { processSale } from '../services/salesService';
+import { recordOfflineSale, syncLocalData } from '../services/offlineSyncService';
+import { isOnline } from '../lib/offlineGuard';
 import { lookupProductsByCode } from '../services/barcodeLookupService';
-import type { PrintableReceipt, Product } from '../types';
+import type { PrintableReceipt, Product, Sale } from '../types';
 
 export default function PosPage() {
   const auth = useAuth() as any;
@@ -44,6 +46,13 @@ export default function PosPage() {
   const [choices, setChoices] = useState<Product[]>([]);
 
   const currencySymbol = store?.currency_symbol || 'ر.س';
+
+  // مزامنة البيانات المحلية عند فتح شاشة البيع إن توفر الاتصال
+  useEffect(() => {
+    if (store?.id && isOnline()) {
+      void syncLocalData(store.id);
+    }
+  }, [store?.id]);
 
   const handleProductSelected = (product: Product) => {
     const res = addItem(product, '1');
@@ -103,8 +112,42 @@ export default function PosPage() {
         customerId: paymentMethod === 'credit' ? selectedCustomer?.id : null,
       };
 
-      const result = await processSale(salePayload);
-      const confirmedSale = result.sale;
+      let confirmedSale: Sale;
+      let isOffline = false;
+
+      const offlineExtra = {
+        customerName: selectedCustomer ? selectedCustomer.name : null,
+        subtotal,
+        totalAmount,
+        itemsDetails: items.map((i) => ({
+          product_id: i.product.id,
+          product_name_snapshot: i.product.name,
+          unit_price_snapshot: i.product.price,
+        })),
+      };
+
+      if (!isOnline()) {
+        const offlineResult = await recordOfflineSale(salePayload, offlineExtra);
+        confirmedSale = offlineResult.sale;
+        isOffline = true;
+      } else {
+        try {
+          const result = await processSale(salePayload);
+          confirmedSale = result.sale;
+        } catch (onlineErr: unknown) {
+          const msg = onlineErr instanceof Error ? onlineErr.message : String(onlineErr);
+          const isNetworkError =
+            !navigator.onLine || /fetch|network|offline|failed to fetch/i.test(msg);
+
+          if (isNetworkError) {
+            const offlineResult = await recordOfflineSale(salePayload, offlineExtra);
+            confirmedSale = offlineResult.sale;
+            isOffline = true;
+          } else {
+            throw onlineErr;
+          }
+        }
+      }
 
       // إعداد بيانات الإيصال الجاهز للطباعة والمشاركة
       const receiptData: PrintableReceipt = {
@@ -130,7 +173,11 @@ export default function PosPage() {
       clearCart();
       setSuccessReceipt(receiptData);
       setIsSuccessModalOpen(true);
-      showToast(ar.saleSuccessDesc, 'success');
+      if (isOffline) {
+        showToast('تم حفظ الفاتورة محلياً بنجاح (بانتظار المزامنة)', 'info');
+      } else {
+        showToast(ar.saleSuccessDesc, 'success');
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'فشلت عملية البيع.';
       showToast(msg, 'error');

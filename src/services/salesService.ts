@@ -1,6 +1,7 @@
 import Decimal from 'decimal.js';
 import { supabase } from '../lib/supabase';
 import type { Customer, PaymentMethod, Sale, SaleItem, SaleStatus } from '../types';
+import { assertOnline } from '../lib/offlineGuard';
 
 export interface ProcessSaleItemPayload {
   product_id: string;
@@ -128,7 +129,6 @@ export async function fetchSaleDetails(saleId: string, isOwner = false): Promise
 
   let items = (itemsData ?? []) as SaleItem[];
 
-  // إذا كان المستدعي مالكاً، استرداد لقطات التكلفة عبر RPC الخاص بالمالك
   if (isOwner) {
     try {
       const { data: costData } = await supabase.rpc('get_sale_items_cost', {
@@ -145,7 +145,7 @@ export async function fetchSaleDetails(saleId: string, isOwner = false): Promise
         }));
       }
     } catch {
-      // إذا فشل الاستعلام لعدم الصلاحية، تستمر العناصر بدون تكلفة
+      // ignore
     }
   }
 
@@ -157,6 +157,8 @@ export async function fetchSaleDetails(saleId: string, isOwner = false): Promise
 }
 
 export async function voidSale(saleId: string, reason: string): Promise<void> {
+  assertOnline('إلغاء الفاتورة');
+
   const cleanReason = reason.trim();
   if (!cleanReason) throw new Error('يرجى كتابة سبب الإلغاء.');
 
@@ -178,6 +180,8 @@ export async function returnItems(
   items: ReturnItemPayload[],
   reason: string
 ): Promise<{ totalRefundAmount: number }> {
+  assertOnline('إرجاع أصناف من الفاتورة');
+
   const cleanReason = reason.trim();
   if (!cleanReason) throw new Error('يرجى كتابة سبب الإرجاع.');
 
