@@ -105,12 +105,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       if (!store) return { success: false, error: ar.storeNotFound };
       const { data, error } = await supabase.rpc('verify_admin_pin', { p_store_id: store.id, p_pin: pin });
-      // verify_admin_pin returns TIMESTAMPTZ directly on success, throws exception on failure
       if (error) return { success: false, error: error.message };
-      // data is a TIMESTAMPTZ string (ISO 8601) returned directly from the SQL function
-      const expiresAt = data as string | null;
-      if (!expiresAt) return { success: false, error: ar.pinWrong };
-      setPinExpiresAt(expiresAt);
+      const result = data as { ok?: boolean; code?: string; message?: string; expires_at?: string } | null;
+      if (!result?.ok) {
+        return {
+          success: false,
+          error: result?.code === 'locked' ? ar.pinLocked : result?.code === 'invalid_pin' ? ar.pinWrong : result?.message ?? ar.genericError,
+        };
+      }
+      const expires = result.expires_at;
+      if (!expires) {
+        return { success: false, error: ar.genericError };
+      }
+      setPinExpiresAt(expires);
       return { success: true };
     },
     signOut: async () => {

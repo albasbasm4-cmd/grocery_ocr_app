@@ -46,10 +46,12 @@ BEGIN
 
     -- تحديث الحقول الحساسة فقط
     UPDATE products SET
-        selling_price = COALESCE(p_selling_price, selling_price),
+        price         = COALESCE(p_selling_price, price),
         cost_price    = COALESCE(p_cost_price, cost_price),
         is_active     = COALESCE(p_is_active, is_active),
         updated_at    = now()
     WHERE id = p_product_id AND store_id = p_store_id;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION update_product_sensitive(UUID, UUID, NUMERIC, NUMERIC, BOOLEAN) TO authenticated;
