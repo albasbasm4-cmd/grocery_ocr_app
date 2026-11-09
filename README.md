@@ -350,7 +350,15 @@ npm run cap:android
 
 - صفحة `/ai-chat` تقدم محادثة عربية، أسئلة جاهزة، عرض حالة الكتابة ورسائل الأخطاء. ترسل الرسالة إلى Supabase Edge Function `ai-chat` فقط؛ لا يتصل المتصفح بمزود النموذج مباشرة.
 - وظيفة `ai-chat` تتحقق من JWT وعضوية المتجر ودور العضو، وتطبق حد 20 طلباً في الدقيقة لكل مستخدم/متجر، وتستخدم استعلامات RPC محددة للقراءة فقط. سجل المحادثة لا يُقبل من العميل لتقليل حقن السياق. بيانات التكلفة والأرباح لا تعاد للموظف من دوال SQL.
-- أضف `GROQ_API_KEY` أو `GEMINI_API_KEY` إلى Supabase Secrets من لوحة التحكم/CLI الآمن. لا تضع هذه الأسرار في `.env` أو GitHub أو كود الواجهة. وظيفة Edge تستخدم Groq عند وجوده ثم Gemini عند عدم وجود Groq.
+- **أسرار الذكاء الاصطناعي:** أضف `GROQ_API_KEY` و `GEMINI_API_KEY` إلى Supabase Secrets من لوحة التحكم أو CLI الآمن. لا تضع هذه الأسرار في `.env` أو GitHub أو كود الواجهة.
+- **نظام التحويل التلقائي الصامت (Silent Failover):**
+  - **المزود الأساسي:** Groq للسرعة الفائقة (النموذج الافتراضي: `llama-3.3-70b-versatile` بمهلة 10 ثوانٍ).
+  - **المزود الاحتياطي:** Google Gemini (النموذج الافتراضي: `gemini-2.5-flash` بمهلة 25 ثانية).
+  - **آلية التحويل:** عند فشل Groq بحالات 429، 401، 403، 408، 5xx، انقطاع الاتصال، انتهاء المهلة، أو 400 (`tool_use_failed`)؛ يتم التحويل فوراً وفي نفس الطلب إلى Gemini. يستمر التحويل على مستوى كل جولة استدعاء داخل حلقة الأدوات.
+  - **التعطيل المؤقت (Cooldown):** عند خطأ 429 أو 403 في Groq، يُحفظ وقت تعطيل مؤقت (بناءً على رأس `Retry-After` أو دقيقة واحدة افتراضياً) لتجاوز Groq وتوجيه الطلبات التالية مباشرة إلى Gemini.
+  - **الأسرار الاختيارية:** `GROQ_MODEL` و `GEMINI_MODEL` لضبط أسماء النماذج المخصصة.
+  - **حماية واجهة المستخدم:** عند تعذر المزودين معاً، تعيد الدالة رداً بحالة 200 برسالة عربية ودية ("المساعد الذكي مشغول قليلاً الآن، حاول بعد لحظات.") وتسجيل الخطأ في `console.error` دون إظهار أخطاء برمجية في الواجهة.
+  - **اختبار التحويل التلقائي:** تشغيل اختبار الوحدة بالبيانات الوهمية عبر `deno test -A supabase/tests/ai_chat_failover_test.ts`.
 - تطبيق قاعدة البيانات: شغّل migrations بحسب الترتيب، بما فيها `20261107000014_phase9_ai_chat_and_tools.sql`، ثم اختبر `supabase/tests/phase9_ai_tools_test.sql` بعد تجهيز مستخدمين ومتاجر اختبار في بيئة محلية مهيأة.
 - شاشة `/java-export` متاحة للمالك فقط. تولّد `ProductRepository.java` وداخلها `Product`، تستخدم `BigDecimal` للقيم، وتهرّب النصوص؛ يتاح نسخ الكود وتنزيله ومشاركته.
 - اختبار ترجمة وتوليد Java: `npx tsx tests/javaExportCompileTest.ts` (يتطلب Node وNix/OpenJDK `javac`).
@@ -558,6 +566,9 @@ supabase db dump --schema-only -f backup_schema_$(date +%Y%m%d).sql
      ```bash
      supabase secrets set GROQ_API_KEY="your-groq-key"
      supabase secrets set GEMINI_API_KEY="your-gemini-key"
+     # أسرار اختيارية لتخصيص النماذج:
+     # supabase secrets set GROQ_MODEL="llama-3.3-70b-versatile"
+     # supabase secrets set GEMINI_MODEL="gemini-2.5-flash"
      ```
 3. **تطبيق الهاتف المحمول (Android Release):**
    - إعداد أسرار GitHub Actions (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, إلخ).

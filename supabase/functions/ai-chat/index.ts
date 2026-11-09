@@ -21,9 +21,212 @@ type Role = 'user' | 'assistant';
 type ToolCall = { id: string; type: 'function'; function: { name: string; arguments: string } };
 type ChatEntry = { role: 'system' | Role | 'tool'; content: string; name?: string; tool_call_id?: string; tool_calls?: ToolCall[] };
 type RequestBody = { store_id?: unknown; message?: unknown; history?: unknown };
+type ModelCompletion = {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+      tool_calls?: ToolCall[];
+    };
+  }>;
+};
+
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
 
-Deno.serve(async (request: Request) => {
+// Cooldown timestamp for Groq (module-level)
+let groqCooldownUntil = 0;
+
+export type ProviderName = 'Groq' | 'Gemini';
+
+export interface ProviderCallResult {
+  ok: boolean;
+  status?: number;
+  data?: unknown;
+  error?: string;
+  isFailoverEligible?: boolean;
+}
+
+export async function callProvider(
+  endpoint: string,
+  apiKey: string,
+  model: string,
+  timeoutMs: number,
+  payload: Record<string, unknown>,
+  providerName: ProviderName,
+  fetchFn: typeof fetch = fetch
+): Promise<ProviderCallResult> {
+  try {
+    const response = await fetchFn(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+      body: JSON.stringify({
+        model,
+        temperature: 0.1,
+        max_tokens: 900,
+        ...payload,
+      }),
+    });
+
+    if (!response.ok) {
+      const status = response.status;
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch {
+        // ignore
+      }
+
+      // 3. التحويل إلى Gemini يحدث عند: 429، 401، 403، 408، 5xx، خطأ اتصال، مهلة، أو 400 يحتوي tool_use_failed
+      const isFailoverEligible =
+        status === 429 ||
+        status === 401 ||
+        status === 403 ||
+        status === 408 ||
+        (status >= 500 && status < 600) ||
+        (status === 400 && errorText.includes('tool_use_failed'));
+
+      // 6. تعطيل مؤقت لـ Groq عند 429 أو 403
+      if (providerName === 'Groq' && (status === 429 || status === 403)) {
+        const retryAfter = response.headers?.get?.('retry-after');
+        let cooldownMs = 60_000;
+        if (retryAfter) {
+          const seconds = Number(retryAfter);
+          if (!Number.isNaN(seconds) && seconds > 0) {
+            cooldownMs = Math.min(seconds * 1000, 300_000);
+          } else {
+            const dateMs = Date.parse(retryAfter);
+            if (!Number.isNaN(dateMs) && dateMs > Date.now()) {
+              cooldownMs = Math.min(dateMs - Date.now(), 300_000);
+            }
+          }
+        }
+        groqCooldownUntil = Date.now() + cooldownMs;
+      }
+
+      return {
+        ok: false,
+        status,
+        error: `HTTP ${status}`,
+        isFailoverEligible,
+      };
+    }
+
+    const data = await response.json();
+    if (!data?.choices?.[0]?.message) {
+      return {
+        ok: false,
+        status: response.status,
+        error: 'Malformed response',
+        isFailoverEligible: true,
+      };
+    }
+
+    return { ok: true, data };
+  } catch (error: unknown) {
+    const isTimeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+    return {
+      ok: false,
+      status: isTimeout ? 408 : undefined,
+      error: isTimeout ? 'timeout' : 'network_error',
+      isFailoverEligible: true,
+    };
+  }
+}
+
+export interface ModelCallOptions {
+  groqKey?: string;
+  geminiKey?: string;
+  groqModel?: string;
+  geminiModel?: string;
+  fetchFn?: typeof fetch;
+}
+
+export function createModelCaller(options: ModelCallOptions) {
+  const {
+    groqKey,
+    geminiKey,
+    groqModel = 'llama-3.3-70b-versatile',
+    geminiModel = 'gemini-2.5-flash',
+    fetchFn = fetch,
+  } = options;
+
+  return async (payload: Record<string, unknown>) => {
+    const isGroqCoolingDown = Date.now() < groqCooldownUntil;
+    const canUseGroq = Boolean(groqKey && (!isGroqCoolingDown || !geminiKey));
+    const canUseGemini = Boolean(geminiKey);
+
+    if (canUseGroq) {
+      const groqRes = await callProvider(
+        'https://api.groq.com/openai/v1/chat/completions',
+        groqKey!,
+        groqModel,
+        10_000,
+        payload,
+        'Groq',
+        fetchFn
+      );
+
+      if (groqRes.ok) {
+        console.info('Answered by provider: Groq');
+        return groqRes.data;
+      }
+
+      console.warn(`Provider Groq failed with status: ${groqRes.status ?? 'network_error'}`);
+
+      if (canUseGemini && groqRes.isFailoverEligible) {
+        const geminiRes = await callProvider(
+          'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+          geminiKey!,
+          geminiModel,
+          25_000,
+          payload,
+          'Gemini',
+          fetchFn
+        );
+
+        if (geminiRes.ok) {
+          console.info('Answered by provider: Gemini');
+          return geminiRes.data;
+        }
+
+        console.warn(`Provider Gemini failed with status: ${geminiRes.status ?? 'network_error'}`);
+        throw new Error(`Both Groq and Gemini failed. Gemini error: ${geminiRes.error}`);
+      }
+
+      throw new Error(`Groq failed: ${groqRes.error}`);
+    }
+
+    if (canUseGemini) {
+      const geminiRes = await callProvider(
+        'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+        geminiKey!,
+        geminiModel,
+        25_000,
+        payload,
+        'Gemini',
+        fetchFn
+      );
+
+      if (geminiRes.ok) {
+        console.info('Answered by provider: Gemini');
+        return geminiRes.data;
+      }
+
+      console.warn(`Provider Gemini failed with status: ${geminiRes.status ?? 'network_error'}`);
+      throw new Error(`Gemini failed: ${geminiRes.error}`);
+    }
+
+    throw new Error('No AI provider configured or available.');
+  };
+}
+
+export const getGroqCooldownUntil = () => groqCooldownUntil;
+export const setGroqCooldownUntil = (val: number) => { groqCooldownUntil = val; };
+
+export const handler = async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (request.method !== 'POST') return json({ error: 'طريقة الطلب غير مدعومة.' }, 405);
 
@@ -31,6 +234,9 @@ Deno.serve(async (request: Request) => {
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const groqKey = Deno.env.get('GROQ_API_KEY');
   const geminiKey = Deno.env.get('GEMINI_API_KEY');
+  const groqModel = Deno.env.get('GROQ_MODEL') || 'llama-3.3-70b-versatile';
+  const geminiModel = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash';
+
   if (!url || !anonKey) return json({ error: 'إعدادات خادم Supabase غير مكتملة.' }, 500);
   if (!groqKey && !geminiKey) return json({ error: 'لم يتم إعداد GROQ_API_KEY أو GEMINI_API_KEY في Supabase Secrets.' }, 503);
   const authorization = request.headers.get('Authorization');
@@ -129,33 +335,27 @@ Deno.serve(async (request: Request) => {
   };
 
   try {
-    const endpoint = groqKey
-      ? 'https://api.groq.com/openai/v1/chat/completions'
-      : 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-    const apiKey = groqKey || geminiKey!;
-    const model = groqKey ? 'llama-3.3-70b-versatile' : 'gemini-2.0-flash';
-    const callModel = async (includeTools: boolean) => {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(25_000),
-        body: JSON.stringify({ model, messages, ...(includeTools ? { tools, tool_choice: 'required' } : {}), temperature: 0.1, max_tokens: 900 }),
+    const callModelInternal = createModelCaller({
+      groqKey: groqKey || undefined,
+      geminiKey: geminiKey || undefined,
+      groqModel,
+      geminiModel,
+    });
+
+    const callModel = (includeTools: boolean) =>
+      callModelInternal({
+        messages,
+        ...(includeTools ? { tools, tool_choice: 'required' } : {}),
       });
-      if (!response.ok) {
-        console.error('AI provider returned status:', response.status);
-        throw new Error('مزود الذكاء الاصطناعي غير متاح حالياً. حاول مرة أخرى لاحقاً.');
-      }
-      return await response.json();
-    };
 
     // أداة/أدوات في جولتين كحد أقصى لتجنب loops والاستهلاك غير المحدود.
     for (let round = 0; round < 2; round += 1) {
-      const completion = await callModel(true);
+      const completion = (await callModel(true)) as ModelCompletion;
       const assistant = completion?.choices?.[0]?.message;
       const calls = Array.isArray(assistant?.tool_calls) ? assistant.tool_calls.slice(0, 4) as ToolCall[] : [];
       if (calls.length === 0) {
         const reply = typeof assistant?.content === 'string' ? assistant.content.trim() : '';
-        if (!reply) return json({ error: 'لم أتمكن من إعداد إجابة من البيانات المتاحة.' }, 502);
+        if (!reply) throw new Error('Empty reply received from model.');
         return json({ reply, tools_used: [...new Set(toolNames)] });
       }
       messages.push({ role: 'assistant', content: '', tool_calls: calls });
@@ -167,12 +367,18 @@ Deno.serve(async (request: Request) => {
         messages.push({ role: 'tool', tool_call_id: toolCall.id, name, content: JSON.stringify(result).slice(0, 8000) });
       }
     }
-    const final = await callModel(false);
+    const final = (await callModel(false)) as ModelCompletion;
     const reply = final?.choices?.[0]?.message?.content;
-    if (typeof reply !== 'string' || !reply.trim()) return json({ error: 'لم أتمكن من إعداد إجابة من البيانات المتاحة.' }, 502);
+    if (typeof reply !== 'string' || !reply.trim()) throw new Error('Empty final reply from model.');
     return json({ reply: reply.trim(), tools_used: [...new Set(toolNames)] });
   } catch (error) {
     console.error('AI chat request failed:', error instanceof Error ? error.message : 'unknown');
-    return json({ error: error instanceof Error && error.name === 'TimeoutError' ? 'استغرق الرد وقتاً طويلاً. حاول مرة أخرى.' : 'تعذر الاتصال بالمساعد الذكي حالياً. يرجى المحاولة لاحقاً.' }, 502);
+    return json({ reply: 'المساعد الذكي مشغول قليلاً الآن، حاول بعد لحظات.', tools_used: [] });
   }
-});
+};
+
+export default handler;
+
+if (import.meta.main) {
+  Deno.serve(handler);
+}
