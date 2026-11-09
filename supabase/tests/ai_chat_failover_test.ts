@@ -2,11 +2,15 @@ import { assertEquals, assertRejects, assert } from "jsr:@std/assert";
 import {
   callProvider,
   createModelCaller,
-  setGroqCooldownUntil,
-  getGroqCooldownUntil,
+  resetCooldowns,
+  getModelCooldown,
+  setModelCooldown,
+  getGeminiGroupCooldownUntil,
+  setGeminiGroupCooldownUntil,
+  DEFAULT_GROQ_MODELS,
+  DEFAULT_GEMINI_MODELS,
 } from "../functions/ai-chat/index.ts";
 
-// Helper to create mock responses
 const createMockResponse = (status: number, body: unknown, headers: Record<string, string> = {}) => {
   return new Response(JSON.stringify(body), {
     status,
@@ -14,19 +18,16 @@ const createMockResponse = (status: number, body: unknown, headers: Record<strin
   });
 };
 
-Deno.test("Case 1: Groq succeeds (Groq ينجح) - calls Groq, skips Gemini", async () => {
-  setGroqCooldownUntil(0);
-  const calls: string[] = [];
+Deno.test("Case 1: First model succeeds (أول نموذج ينجح) - calls first model and finishes", async () => {
+  resetCooldowns();
+  const calledModels: string[] = [];
 
-  const mockFetch = async (input: string | URL | Request) => {
-    const url = input.toString();
-    calls.push(url);
-    if (url.includes("api.groq.com")) {
-      return createMockResponse(200, {
-        choices: [{ message: { content: "مرحباً، إجابة من Groq" } }],
-      });
-    }
-    throw new Error("Gemini should not be called when Groq succeeds");
+  const mockFetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(init?.body as string);
+    calledModels.push(body.model);
+    return createMockResponse(200, {
+      choices: [{ message: { content: "إجابة من النموذج الأول" } }],
+    });
   };
 
   const caller = createModelCaller({
@@ -35,31 +36,28 @@ Deno.test("Case 1: Groq succeeds (Groq ينجح) - calls Groq, skips Gemini", as
     fetchFn: mockFetch as unknown as typeof fetch,
   });
 
-  const res = await caller({ messages: [{ role: "user", content: "test" }] }) as {
+  const res = await caller({ messages: [{ role: "user", content: "مرحبا" }] }) as {
     choices: Array<{ message: { content: string } }>;
   };
 
-  assertEquals(calls.length, 1);
-  assert(calls[0].includes("api.groq.com"));
-  assertEquals(res.choices[0].message.content, "مرحباً، إجابة من Groq");
+  assertEquals(calledModels.length, 1);
+  assertEquals(calledModels[0], DEFAULT_GROQ_MODELS[0]); // openai/gpt-oss-120b
+  assertEquals(res.choices[0].message.content, "إجابة من النموذج الأول");
 });
 
-Deno.test("Case 2: Groq returns 429 (Groq يعيد 429) - fails over to Gemini and sets cooldown", async () => {
-  setGroqCooldownUntil(0);
-  const calls: string[] = [];
+Deno.test("Case 2: First model 429, second succeeds (أول نموذج 429 والثاني ينجح)", async () => {
+  resetCooldowns();
+  const calledModels: string[] = [];
 
-  const mockFetch = async (input: string | URL | Request) => {
-    const url = input.toString();
-    calls.push(url);
-    if (url.includes("api.groq.com")) {
-      return createMockResponse(429, { error: "Rate limit reached" }, { "retry-after": "30" });
+  const mockFetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(init?.body as string);
+    calledModels.push(body.model);
+    if (body.model === DEFAULT_GROQ_MODELS[0]) {
+      return createMockResponse(429, { error: "Rate limit reached" }, { "retry-after": "45" });
     }
-    if (url.includes("generativelanguage.googleapis.com")) {
-      return createMockResponse(200, {
-        choices: [{ message: { content: "إجابة احتياطية من Gemini بعد 429" } }],
-      });
-    }
-    throw new Error(`Unexpected URL: ${url}`);
+    return createMockResponse(200, {
+      choices: [{ message: { content: "إجابة من النموذج الثاني" } }],
+    });
   };
 
   const caller = createModelCaller({
@@ -68,150 +66,151 @@ Deno.test("Case 2: Groq returns 429 (Groq يعيد 429) - fails over to Gemini a
     fetchFn: mockFetch as unknown as typeof fetch,
   });
 
-  const res = await caller({ messages: [{ role: "user", content: "test" }] }) as {
+  const res = await caller({ messages: [{ role: "user", content: "مرحبا" }] }) as {
     choices: Array<{ message: { content: string } }>;
   };
 
-  assertEquals(calls.length, 2);
-  assert(calls[0].includes("api.groq.com"));
-  assert(calls[1].includes("generativelanguage.googleapis.com"));
-  assertEquals(res.choices[0].message.content, "إجابة احتياطية من Gemini بعد 429");
-  assert(getGroqCooldownUntil() > Date.now());
-
-  // Subsequent call while in cooldown should bypass Groq and call Gemini directly
-  calls.length = 0;
-  const res2 = await caller({ messages: [{ role: "user", content: "test 2" }] }) as {
-    choices: Array<{ message: { content: string } }>;
-  };
-  assertEquals(calls.length, 1);
-  assert(calls[0].includes("generativelanguage.googleapis.com"));
-  assertEquals(res2.choices[0].message.content, "إجابة احتياطية من Gemini بعد 429");
+  assertEquals(calledModels.length, 2);
+  assertEquals(calledModels[0], DEFAULT_GROQ_MODELS[0]);
+  assertEquals(calledModels[1], DEFAULT_GROQ_MODELS[1]);
+  assertEquals(res.choices[0].message.content, "إجابة من النموذج الثاني");
+  assert(getModelCooldown("Groq", DEFAULT_GROQ_MODELS[0]) > Date.now());
 });
 
-Deno.test("Case 3: Groq returns 500 (Groq يعيد 500) - fails over to Gemini", async () => {
-  setGroqCooldownUntil(0);
-  const calls: string[] = [];
+Deno.test("Case 3: Cascading failures across models (تتابع عدة نماذج فاشلة)", async () => {
+  resetCooldowns();
+  const calledModels: string[] = [];
 
-  const mockFetch = async (input: string | URL | Request) => {
-    const url = input.toString();
-    calls.push(url);
-    if (url.includes("api.groq.com")) {
-      return createMockResponse(500, { error: "Internal Server Error" });
-    }
-    if (url.includes("generativelanguage.googleapis.com")) {
-      return createMockResponse(200, {
-        choices: [{ message: { content: "إجابة من Gemini بعد خطأ 500 في Groq" } }],
-      });
-    }
-    throw new Error(`Unexpected URL: ${url}`);
-  };
-
-  const caller = createModelCaller({
-    groqKey: "mock-groq-key",
-    geminiKey: "mock-gemini-key",
-    fetchFn: mockFetch as unknown as typeof fetch,
-  });
-
-  const res = await caller({ messages: [{ role: "user", content: "test" }] }) as {
-    choices: Array<{ message: { content: string } }>;
-  };
-
-  assertEquals(calls.length, 2);
-  assert(calls[0].includes("api.groq.com"));
-  assert(calls[1].includes("generativelanguage.googleapis.com"));
-  assertEquals(res.choices[0].message.content, "إجابة من Gemini بعد خطأ 500 في Groq");
-});
-
-Deno.test("Case 4: Groq times out (Groq ينتهي بمهلة) - fails over to Gemini", async () => {
-  setGroqCooldownUntil(0);
-  const calls: string[] = [];
-
-  const mockFetch = async (input: string | URL | Request) => {
-    const url = input.toString();
-    calls.push(url);
-    if (url.includes("api.groq.com")) {
-      const err = new Error("The signal has been aborted");
-      err.name = "TimeoutError";
-      throw err;
-    }
-    if (url.includes("generativelanguage.googleapis.com")) {
-      return createMockResponse(200, {
-        choices: [{ message: { content: "إجابة من Gemini بعد انتهاء مهلة Groq" } }],
-      });
-    }
-    throw new Error(`Unexpected URL: ${url}`);
-  };
-
-  const caller = createModelCaller({
-    groqKey: "mock-groq-key",
-    geminiKey: "mock-gemini-key",
-    fetchFn: mockFetch as unknown as typeof fetch,
-  });
-
-  const res = await caller({ messages: [{ role: "user", content: "test" }] }) as {
-    choices: Array<{ message: { content: string } }>;
-  };
-
-  assertEquals(calls.length, 2);
-  assert(calls[0].includes("api.groq.com"));
-  assert(calls[1].includes("generativelanguage.googleapis.com"));
-  assertEquals(res.choices[0].message.content, "إجابة من Gemini بعد انتهاء مهلة Groq");
-});
-
-Deno.test("Case 5: Groq fails in round 2 of tools (Groq يفشل في الجولة الثانية) - Gemini completes conversation seamlessly", async () => {
-  setGroqCooldownUntil(0);
-  let groqCallCount = 0;
-  let geminiCallCount = 0;
-
-  const mockFetch = async (input: string | URL | Request, init?: RequestInit) => {
-    const url = input.toString();
-    if (url.includes("api.groq.com")) {
-      groqCallCount += 1;
-      if (groqCallCount === 1) {
-        // Round 1: Groq succeeds and returns a tool call
-        return createMockResponse(200, {
-          choices: [
-            {
-              message: {
-                content: "",
-                tool_calls: [
-                  {
-                    id: "call_abc123",
-                    type: "function",
-                    function: {
-                      name: "get_low_stock",
-                      arguments: "{}",
-                    },
-                  },
-                ],
-              },
-            },
-          ],
-        });
-      }
-      // Round 2: Groq fails with 503
+  const mockFetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(init?.body as string);
+    calledModels.push(body.model);
+    if (calledModels.length <= 3) {
       return createMockResponse(503, { error: "Service Unavailable" });
     }
+    return createMockResponse(200, {
+      choices: [{ message: { content: "نجح بعد 3 إخفاقات" } }],
+    });
+  };
 
-    if (url.includes("generativelanguage.googleapis.com")) {
-      geminiCallCount += 1;
-      // Verify that Gemini receives the messages history including tool response
-      const body = JSON.parse(init?.body as string);
-      const msgs = body.messages as Array<{ role: string; content?: string; name?: string }>;
-      assert(msgs.some((m) => m.role === "tool" && m.name === "get_low_stock"));
+  const caller = createModelCaller({
+    groqKey: "mock-groq-key",
+    geminiKey: "mock-gemini-key",
+    fetchFn: mockFetch as unknown as typeof fetch,
+  });
 
+  const res = await caller({ messages: [{ role: "user", content: "مرحبا" }] }) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+
+  assertEquals(calledModels.length, 4);
+  assertEquals(calledModels[0], DEFAULT_GROQ_MODELS[0]);
+  assertEquals(calledModels[1], DEFAULT_GROQ_MODELS[1]);
+  assertEquals(calledModels[2], DEFAULT_GROQ_MODELS[2]);
+  assertEquals(calledModels[3], DEFAULT_GROQ_MODELS[3]);
+  assertEquals(res.choices[0].message.content, "نجح بعد 3 إخفاقات");
+});
+
+Deno.test("Case 4: Decommissioned model 404 and skip (نموذج متقاعد 404 وتخطيه)", async () => {
+  resetCooldowns();
+  const calledModels: string[] = [];
+
+  const mockFetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(init?.body as string);
+    calledModels.push(body.model);
+    if (body.model === DEFAULT_GROQ_MODELS[0]) {
+      return createMockResponse(404, { error: "Model decommissioned or not found" });
+    }
+    return createMockResponse(200, {
+      choices: [{ message: { content: "إجابة بعد تخطي 404" } }],
+    });
+  };
+
+  const caller = createModelCaller({
+    groqKey: "mock-groq-key",
+    geminiKey: "mock-gemini-key",
+    fetchFn: mockFetch as unknown as typeof fetch,
+  });
+
+  const res = await caller({ messages: [{ role: "user", content: "مرحبا" }] }) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+
+  assertEquals(calledModels.length, 2);
+  assertEquals(res.choices[0].message.content, "إجابة بعد تخطي 404");
+  // 404 sets 1 hour cooldown
+  const cooldown = getModelCooldown("Groq", DEFAULT_GROQ_MODELS[0]);
+  assert(cooldown >= Date.now() + 3_500_000);
+});
+
+Deno.test("Case 5: Skipping cooled-down model (تجاوز نموذج معطّل مؤقتاً)", async () => {
+  resetCooldowns();
+  // Pre-set cooldown for first model
+  setModelCooldown("Groq", DEFAULT_GROQ_MODELS[0], Date.now() + 120_000);
+
+  const calledModels: string[] = [];
+  const mockFetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(init?.body as string);
+    calledModels.push(body.model);
+    return createMockResponse(200, {
+      choices: [{ message: { content: "إجابة مباشرة من الثاني لتجاوز الأول المعطل" } }],
+    });
+  };
+
+  const caller = createModelCaller({
+    groqKey: "mock-groq-key",
+    geminiKey: "mock-gemini-key",
+    fetchFn: mockFetch as unknown as typeof fetch,
+  });
+
+  const res = await caller({ messages: [{ role: "user", content: "مرحبا" }] }) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+
+  assertEquals(calledModels.length, 1);
+  assertEquals(calledModels[0], DEFAULT_GROQ_MODELS[1]); // Skipped model 0 completely
+  assertEquals(res.choices[0].message.content, "إجابة مباشرة من الثاني لتجاوز الأول المعطل");
+});
+
+Deno.test("Case 6: Failure in round 2 of tools (فشل في الجولة الثانية من الأدوات)", async () => {
+  resetCooldowns();
+  let round1Call = 0;
+  let round2Call = 0;
+
+  const mockFetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(init?.body as string);
+    if (body.tools && body.tools.length > 0) {
+      // Round 1
+      round1Call += 1;
       return createMockResponse(200, {
         choices: [
           {
             message: {
-              content: "المنتجات المنخفضة هي: حليب المراعي (2 علبة)، سكر الأسرة (1 كيس).",
+              content: "",
+              tool_calls: [
+                {
+                  id: "call_stock_1",
+                  type: "function",
+                  function: { name: "get_low_stock", arguments: "{}" },
+                },
+              ],
             },
           },
         ],
       });
     }
 
-    throw new Error(`Unexpected URL: ${url}`);
+    // Round 2
+    round2Call += 1;
+    if (body.model === DEFAULT_GROQ_MODELS[0]) {
+      return createMockResponse(500, { error: "Failed in round 2" });
+    }
+
+    // Next model receives messages including tool response
+    const msgs = body.messages as Array<{ role: string; content?: string }>;
+    assert(msgs.some((m) => m.role === "tool"));
+    return createMockResponse(200, {
+      choices: [{ message: { content: "المنتجات المنخفضة: حليب وزيت." } }],
+    });
   };
 
   const caller = createModelCaller({
@@ -220,57 +219,31 @@ Deno.test("Case 5: Groq fails in round 2 of tools (Groq يفشل في الجول
     fetchFn: mockFetch as unknown as typeof fetch,
   });
 
-  const messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string; name?: string }> = [
-    { role: "system", content: "أنت مساعد متجر بقالة." },
-    { role: "user", content: "ما هي المنتجات منخفضة المخزون؟" },
+  const messages = [
+    { role: "system", content: "مساعد بقالة" },
+    { role: "user", content: "ما المنتجات الناقصة؟" },
   ];
 
-  // Round 1: Groq calls tool
-  const round1 = await caller({ messages, tools: [], tool_choice: "required" }) as {
-    choices: Array<{ message: { tool_calls: Array<{ id: string; function: { name: string } }> } }>;
+  // Round 1
+  const r1 = await caller({ messages, tools: [{ type: "function", function: { name: "get_low_stock" } }] }) as {
+    choices: Array<{ message: { tool_calls: unknown[] } }>;
   };
-  assertEquals(round1.choices[0].message.tool_calls[0].function.name, "get_low_stock");
+  messages.push({ role: "assistant", content: "", tool_calls: r1.choices[0].message.tool_calls } as any);
+  messages.push({ role: "tool", tool_call_id: "call_stock_1", name: "get_low_stock", content: "[{\"name\":\"حليب\"}]" } as any);
 
-  // Push tool call & tool result to messages
-  messages.push({
-    role: "assistant",
-    content: "",
-    tool_calls: round1.choices[0].message.tool_calls,
-  });
-  messages.push({
-    role: "tool",
-    tool_call_id: "call_abc123",
-    name: "get_low_stock",
-    content: JSON.stringify([{ name: "حليب المراعي", stock: 2 }, { name: "سكر الأسرة", stock: 1 }]),
-  });
-
-  // Round 2: Groq fails -> Gemini picks up
-  const round2 = await caller({ messages }) as {
+  // Round 2
+  const r2 = await caller({ messages }) as {
     choices: Array<{ message: { content: string } }>;
   };
 
-  assertEquals(groqCallCount, 2);
-  assertEquals(geminiCallCount, 1);
-  assertEquals(
-    round2.choices[0].message.content,
-    "المنتجات المنخفضة هي: حليب المراعي (2 علبة)، سكر الأسرة (1 كيس)."
-  );
+  assertEquals(r2.choices[0].message.content, "المنتجات المنخفضة: حليب وزيت.");
 });
 
-Deno.test("Case 6: Both fail (كلاهما يفشل) - error thrown to trigger friendly fallback", async () => {
-  setGroqCooldownUntil(0);
-  const calls: string[] = [];
+Deno.test("Case 7: All models fail (فشل كل النماذج)", async () => {
+  resetCooldowns();
 
-  const mockFetch = async (input: string | URL | Request) => {
-    const url = input.toString();
-    calls.push(url);
-    if (url.includes("api.groq.com")) {
-      return createMockResponse(502, { error: "Bad Gateway" });
-    }
-    if (url.includes("generativelanguage.googleapis.com")) {
-      return createMockResponse(503, { error: "Service Overloaded" });
-    }
-    throw new Error(`Unexpected URL: ${url}`);
+  const mockFetch = async () => {
+    return createMockResponse(502, { error: "Bad Gateway" });
   };
 
   const caller = createModelCaller({
@@ -281,136 +254,133 @@ Deno.test("Case 6: Both fail (كلاهما يفشل) - error thrown to trigger f
 
   await assertRejects(
     async () => {
-      await caller({ messages: [{ role: "user", content: "test" }] });
+      await caller({ messages: [{ role: "user", content: "مرحبا" }] });
     },
     Error,
-    "Both Groq and Gemini failed"
+    "All model attempts failed or timed out"
   );
-
-  assertEquals(calls.length, 2);
 });
 
-Deno.test("Case 7A: Only Groq key exists (Groq فقط) - succeeds or fails without Gemini", async () => {
-  setGroqCooldownUntil(0);
-  const calls: string[] = [];
+Deno.test("Case 8: Single provider key (مفتاح مزود واحد فقط)", async () => {
+  resetCooldowns();
 
-  const mockFetch = async (input: string | URL | Request) => {
-    const url = input.toString();
-    calls.push(url);
-    if (url.includes("api.groq.com")) {
-      return createMockResponse(500, { error: "Internal Error" });
-    }
-    throw new Error("Should not reach Gemini when key is missing");
-  };
-
-  const caller = createModelCaller({
+  // Groq only
+  const groqOnlyCalls: string[] = [];
+  const callerGroq = createModelCaller({
     groqKey: "mock-groq-key",
     geminiKey: undefined,
-    fetchFn: mockFetch as unknown as typeof fetch,
+    fetchFn: (async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(init?.body as string);
+      groqOnlyCalls.push(body.model);
+      return createMockResponse(200, { choices: [{ message: { content: "رد من Groq فقط" } }] });
+    }) as unknown as typeof fetch,
   });
+  await callerGroq({ messages: [{ role: "user", content: "مرحبا" }] });
+  assertEquals(groqOnlyCalls.length, 1);
+  assert(DEFAULT_GROQ_MODELS.includes(groqOnlyCalls[0]));
 
-  await assertRejects(
-    async () => {
-      await caller({ messages: [{ role: "user", content: "test" }] });
-    },
-    Error,
-    "Groq failed"
-  );
-
-  assertEquals(calls.length, 1);
+  // Gemini only
+  const geminiOnlyCalls: string[] = [];
+  const callerGemini = createModelCaller({
+    groqKey: undefined,
+    geminiKey: "mock-gemini-key",
+    fetchFn: (async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(init?.body as string);
+      geminiOnlyCalls.push(body.model);
+      return createMockResponse(200, { choices: [{ message: { content: "رد من Gemini فقط" } }] });
+    }) as unknown as typeof fetch,
+  });
+  await callerGemini({ messages: [{ role: "user", content: "مرحبا" }] });
+  assertEquals(geminiOnlyCalls.length, 1);
+  assertEquals(geminiOnlyCalls[0], DEFAULT_GEMINI_MODELS[0]);
 });
 
-Deno.test("Case 7B: Only Gemini key exists (Gemini فقط) - calls Gemini directly", async () => {
-  setGroqCooldownUntil(0);
-  const calls: string[] = [];
+Deno.test("Case 9: Two consecutive Gemini 429s triggers Gemini group cooldown (تعطيل مجموعة Gemini)", async () => {
+  resetCooldowns();
+  const calledModels: string[] = [];
 
-  const mockFetch = async (input: string | URL | Request) => {
-    const url = input.toString();
-    calls.push(url);
-    if (url.includes("generativelanguage.googleapis.com")) {
-      return createMockResponse(200, {
-        choices: [{ message: { content: "إجابة من Gemini مباشرة" } }],
-      });
+  const mockFetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(init?.body as string);
+    calledModels.push(body.model);
+    // Let Gemini models return 429
+    if (body.model.startsWith("gemini-")) {
+      return createMockResponse(429, { error: "RESOURCE_EXHAUSTED: daily limit exceeded" });
     }
-    throw new Error("Should not reach Groq when key is missing");
+    return createMockResponse(500, { error: "Groq server error" });
   };
 
   const caller = createModelCaller({
-    groqKey: undefined,
+    groqKey: undefined, // test Gemini group directly
     geminiKey: "mock-gemini-key",
     fetchFn: mockFetch as unknown as typeof fetch,
   });
 
-  const res = await caller({ messages: [{ role: "user", content: "test" }] }) as {
-    choices: Array<{ message: { content: string } }>;
-  };
-
-  assertEquals(calls.length, 1);
-  assert(calls[0].includes("generativelanguage.googleapis.com"));
-  assertEquals(res.choices[0].message.content, "إجابة من Gemini مباشرة");
-});
-
-Deno.test("Case 8: Groq 400 with tool_use_failed triggers failover, but normal 400 does not", async () => {
-  setGroqCooldownUntil(0);
-
-  // Normal 400 (e.g. malformed body) -> should NOT failover
-  const normal400Caller = createModelCaller({
-    groqKey: "mock-groq-key",
-    geminiKey: "mock-gemini-key",
-    fetchFn: (async (input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("api.groq.com")) {
-        return createMockResponse(400, { error: "Invalid parameter: max_tokens must be positive" });
-      }
-      throw new Error("Should not failover on normal 400");
-    }) as unknown as typeof fetch,
-  });
-
   await assertRejects(
     async () => {
-      await normal400Caller({ messages: [{ role: "user", content: "test" }] });
+      await caller({ messages: [{ role: "user", content: "مرحبا" }] });
     },
-    Error,
-    "Groq failed"
+    Error
   );
 
-  // 400 containing 'tool_use_failed' -> SHOULD failover to Gemini
-  const toolFail400Caller = createModelCaller({
-    groqKey: "mock-groq-key",
-    geminiKey: "mock-gemini-key",
-    fetchFn: (async (input: string | URL | Request) => {
-      const url = input.toString();
-      if (url.includes("api.groq.com")) {
-        return createMockResponse(400, { error: "failed generation: tool_use_failed" });
-      }
-      if (url.includes("generativelanguage.googleapis.com")) {
-        return createMockResponse(200, {
-          choices: [{ message: { content: "نجح بعد tool_use_failed" } }],
-        });
-      }
-      throw new Error("Unexpected URL");
-    }) as unknown as typeof fetch,
-  });
+  // First 2 Gemini models failed with 429 -> Group cooldown triggered
+  assertEquals(calledModels.length, 2);
+  assertEquals(calledModels[0], DEFAULT_GEMINI_MODELS[0]);
+  assertEquals(calledModels[1], DEFAULT_GEMINI_MODELS[1]);
+  assert(getGeminiGroupCooldownUntil() > Date.now());
 
-  const res = await toolFail400Caller({ messages: [{ role: "user", content: "test" }] }) as {
-    choices: Array<{ message: { content: string } }>;
-  };
-  assertEquals(res.choices[0].message.content, "نجح بعد tool_use_failed");
+  // Next request should immediately skip all Gemini models because group is cooling down
+  calledModels.length = 0;
+  await assertRejects(
+    async () => {
+      await caller({ messages: [{ role: "user", content: "مرحبا 2" }] });
+    },
+    Error
+  );
+  assertEquals(calledModels.length, 0); // No calls made at all
 });
 
-Deno.test("Case 9: Handler fallback response when both providers fail - returns 200 with friendly Arabic message", async () => {
-  // Set required dummy env vars for handler
+Deno.test("Case 10: Timeout triggers failover (انتهاء المهلة)", async () => {
+  resetCooldowns();
+  const calledModels: string[] = [];
+
+  const mockFetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(init?.body as string);
+    calledModels.push(body.model);
+    if (body.model === DEFAULT_GROQ_MODELS[0]) {
+      const err = new Error("AbortError: The signal has been aborted");
+      err.name = "TimeoutError";
+      throw err;
+    }
+    return createMockResponse(200, {
+      choices: [{ message: { content: "إجابة بعد مهلة النموذج الأول" } }],
+    });
+  };
+
+  const caller = createModelCaller({
+    groqKey: "mock-groq-key",
+    geminiKey: "mock-gemini-key",
+    fetchFn: mockFetch as unknown as typeof fetch,
+  });
+
+  const res = await caller({ messages: [{ role: "user", content: "مرحبا" }] }) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+
+  assertEquals(calledModels.length, 2);
+  assertEquals(res.choices[0].message.content, "إجابة بعد مهلة النموذج الأول");
+});
+
+Deno.test("Case 11: Handler returns friendly 200 response when all models fail", async () => {
   Deno.env.set("SUPABASE_URL", "https://dummy.supabase.co");
   Deno.env.set("SUPABASE_ANON_KEY", "dummy-anon-key");
   Deno.env.set("GROQ_API_KEY", "dummy-groq-key");
   Deno.env.set("GEMINI_API_KEY", "dummy-gemini-key");
 
-  // Mock global fetch to fail for both model providers, but return mock data for Supabase auth/RPC
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = input.toString();
     if (url.includes("auth/v1/user")) {
-      return createMockResponse(200, { user: { id: "user-123" } });
+      return createMockResponse(200, { user: { id: "user-test" } });
     }
     if (url.includes("store_members")) {
       return createMockResponse(200, { role: "owner", is_active: true });
@@ -418,13 +388,7 @@ Deno.test("Case 9: Handler fallback response when both providers fail - returns 
     if (url.includes("rpc/check_and_increment_ai_rate_limit")) {
       return createMockResponse(200, { allowed: true });
     }
-    if (url.includes("api.groq.com")) {
-      return createMockResponse(500, { error: "Groq Down" });
-    }
-    if (url.includes("generativelanguage.googleapis.com")) {
-      return createMockResponse(503, { error: "Gemini Down" });
-    }
-    return originalFetch(input);
+    return createMockResponse(500, { error: "All AI providers down" });
   }) as unknown as typeof fetch;
 
   try {
@@ -432,12 +396,12 @@ Deno.test("Case 9: Handler fallback response when both providers fail - returns 
     const req = new Request("http://localhost/ai-chat", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer mock-token-12345",
+        Authorization: "Bearer mock-jwt-token",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        store_id: "00000000-0000-0000-0000-000000000000",
-        message: "كم عدد المنتجات المنتهية؟",
+        store_id: "11111111-1111-1111-1111-111111111111",
+        message: "أريد معرفة المنتجات المنتهية",
       }),
     });
 
@@ -449,4 +413,51 @@ Deno.test("Case 9: Handler fallback response when both providers fail - returns 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+Deno.test("Case 12: 400 with tool_use_failed triggers failover, normal 400 throws immediately", async () => {
+  resetCooldowns();
+
+  // Normal 400 -> throws without calling second model
+  let callCount = 0;
+  const callerNormal400 = createModelCaller({
+    groqKey: "mock-groq-key",
+    geminiKey: "mock-gemini-key",
+    fetchFn: (async () => {
+      callCount += 1;
+      return createMockResponse(400, { error: "Bad Request: invalid_parameter" });
+    }) as unknown as typeof fetch,
+  });
+
+  await assertRejects(
+    async () => {
+      await callerNormal400({ messages: [{ role: "user", content: "test" }] });
+    },
+    Error,
+    "Unrecoverable error"
+  );
+  assertEquals(callCount, 1);
+
+  // 400 containing tool_use_failed -> should failover to next model
+  const modelsCalled: string[] = [];
+  const callerToolFailed400 = createModelCaller({
+    groqKey: "mock-groq-key",
+    geminiKey: "mock-gemini-key",
+    fetchFn: (async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(init?.body as string);
+      modelsCalled.push(body.model);
+      if (body.model === DEFAULT_GROQ_MODELS[0]) {
+        return createMockResponse(400, { error: "generation error: tool_use_failed" });
+      }
+      return createMockResponse(200, {
+        choices: [{ message: { content: "إجابة بعد tool_use_failed" } }],
+      });
+    }) as unknown as typeof fetch,
+  });
+
+  const res = await callerToolFailed400({ messages: [{ role: "user", content: "test" }] }) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+  assertEquals(modelsCalled.length, 2);
+  assertEquals(res.choices[0].message.content, "إجابة بعد tool_use_failed");
 });

@@ -32,10 +32,49 @@ type ModelCompletion = {
 
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
 
-// Cooldown timestamp for Groq (module-level)
-let groqCooldownUntil = 0;
-
 export type ProviderName = 'Groq' | 'Gemini';
+
+export const DEFAULT_GROQ_MODELS = [
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'qwen/qwen3.8-27b',
+  'qwen/qwen3.6-27b',
+];
+
+export const DEFAULT_GEMINI_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-2.5-flash',
+];
+
+export function parseModelList(envValue: string | undefined, defaultList: string[]): string[] {
+  if (!envValue || !envValue.trim()) return [...defaultList];
+  const parsed = envValue.split(',').map((s) => s.trim()).filter(Boolean);
+  return parsed.length > 0 ? parsed : [...defaultList];
+}
+
+// Module-level cooldown tracking per model and for Gemini project quota
+const modelCooldowns = new Map<string, number>();
+let geminiGroupCooldownUntil = 0;
+
+export const resetCooldowns = () => {
+  modelCooldowns.clear();
+  geminiGroupCooldownUntil = 0;
+};
+
+export const getModelCooldown = (provider: string, model: string): number => {
+  return modelCooldowns.get(`${provider}:${model}`) ?? 0;
+};
+
+export const setModelCooldown = (provider: string, model: string, untilMs: number) => {
+  modelCooldowns.set(`${provider}:${model}`, untilMs);
+};
+
+export const getGeminiGroupCooldownUntil = () => geminiGroupCooldownUntil;
+export const setGeminiGroupCooldownUntil = (untilMs: number) => {
+  geminiGroupCooldownUntil = untilMs;
+};
 
 export interface ProviderCallResult {
   ok: boolean;
@@ -79,31 +118,32 @@ export async function callProvider(
         // ignore
       }
 
-      // 3. التحويل إلى Gemini يحدث عند: 429، 401، 403، 408، 5xx، خطأ اتصال، مهلة، أو 400 يحتوي tool_use_failed
+      // 3. الانتقال إلى النموذج التالي يحدث عند: 429، 404، 401، 403، 408، أي 5xx، خطأ اتصال، مهلة، أو 400 يحتوي tool_use_failed
       const isFailoverEligible =
         status === 429 ||
+        status === 404 ||
         status === 401 ||
         status === 403 ||
         status === 408 ||
         (status >= 500 && status < 600) ||
         (status === 400 && errorText.includes('tool_use_failed'));
 
-      // 6. تعطيل مؤقت لـ Groq عند 429 أو 403
-      if (providerName === 'Groq' && (status === 429 || status === 403)) {
+      // 5. التعطيل المؤقت لكل نموذج على حدة عند 429 أو 404 أو 403
+      if (status === 429 || status === 404 || status === 403) {
+        let cooldownMs = status === 404 ? 3_600_000 : 60_000;
         const retryAfter = response.headers?.get?.('retry-after');
-        let cooldownMs = 60_000;
         if (retryAfter) {
           const seconds = Number(retryAfter);
           if (!Number.isNaN(seconds) && seconds > 0) {
-            cooldownMs = Math.min(seconds * 1000, 300_000);
+            cooldownMs = Math.min(seconds * 1000, 3_600_000);
           } else {
             const dateMs = Date.parse(retryAfter);
             if (!Number.isNaN(dateMs) && dateMs > Date.now()) {
-              cooldownMs = Math.min(dateMs - Date.now(), 300_000);
+              cooldownMs = Math.min(dateMs - Date.now(), 3_600_000);
             }
           }
         }
-        groqCooldownUntil = Date.now() + cooldownMs;
+        modelCooldowns.set(`${providerName}:${model}`, Date.now() + cooldownMs);
       }
 
       return {
@@ -136,95 +176,140 @@ export async function callProvider(
   }
 }
 
+export interface CandidateModel {
+  provider: ProviderName;
+  model: string;
+  endpoint: string;
+  apiKey: string;
+  timeoutMs: number;
+}
+
 export interface ModelCallOptions {
   groqKey?: string;
   geminiKey?: string;
-  groqModel?: string;
-  geminiModel?: string;
+  groqModels?: string[];
+  geminiModels?: string[];
   fetchFn?: typeof fetch;
+  maxAttempts?: number;
+  totalTimeoutMs?: number;
 }
 
 export function createModelCaller(options: ModelCallOptions) {
   const {
     groqKey,
     geminiKey,
-    groqModel = 'llama-3.3-70b-versatile',
-    geminiModel = 'gemini-2.5-flash',
+    groqModels = DEFAULT_GROQ_MODELS,
+    geminiModels = DEFAULT_GEMINI_MODELS,
     fetchFn = fetch,
+    maxAttempts = 6,
+    totalTimeoutMs = 45_000,
   } = options;
 
   return async (payload: Record<string, unknown>) => {
-    const isGroqCoolingDown = Date.now() < groqCooldownUntil;
-    const canUseGroq = Boolean(groqKey && (!isGroqCoolingDown || !geminiKey));
-    const canUseGemini = Boolean(geminiKey);
+    // بناء سلسلة النماذج: كل نماذج Groq أولاً (للسرعة) ثم كل نماذج Gemini
+    const candidates: CandidateModel[] = [];
 
-    if (canUseGroq) {
-      const groqRes = await callProvider(
-        'https://api.groq.com/openai/v1/chat/completions',
-        groqKey!,
-        groqModel,
-        10_000,
+    if (groqKey) {
+      for (const model of groqModels) {
+        candidates.push({
+          provider: 'Groq',
+          model,
+          endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+          apiKey: groqKey,
+          timeoutMs: 10_000,
+        });
+      }
+    }
+
+    if (geminiKey) {
+      for (const model of geminiModels) {
+        candidates.push({
+          provider: 'Gemini',
+          model,
+          endpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+          apiKey: geminiKey,
+          timeoutMs: 15_000,
+        });
+      }
+    }
+
+    if (candidates.length === 0) {
+      throw new Error('No AI provider configured or available.');
+    }
+
+    const startTime = Date.now();
+    let actualAttempts = 0;
+    let consecutiveGemini429s = 0;
+    let lastError: string | undefined;
+
+    for (const candidate of candidates) {
+      // التحقق من المهلة الإجمالية
+      if (Date.now() - startTime >= totalTimeoutMs) {
+        console.warn('Total model failover timeout (~45s) exceeded.');
+        break;
+      }
+
+      // التحقق من الحد الأقصى للمحاولات الفعلية (حد أقصى 6 محاولات)
+      if (actualAttempts >= maxAttempts) {
+        console.warn(`Reached maximum actual model attempts (${maxAttempts}).`);
+        break;
+      }
+
+      // 6. التحقق من تعطيل مجموعة Gemini عند نفاد الحصة المجمعة (429 متتاليان)
+      if (candidate.provider === 'Gemini' && Date.now() < geminiGroupCooldownUntil) {
+        continue;
+      }
+
+      // 5. التحقق من التعطيل المؤقت للنموذج المحدد
+      const cooldownUntil = modelCooldowns.get(`${candidate.provider}:${candidate.model}`) ?? 0;
+      if (Date.now() < cooldownUntil) {
+        continue;
+      }
+
+      // تنفيذ المحاولة الفعلية
+      actualAttempts += 1;
+      const remainingTime = Math.max(1_000, totalTimeoutMs - (Date.now() - startTime));
+      const effectiveTimeout = Math.min(candidate.timeoutMs, remainingTime);
+
+      const res = await callProvider(
+        candidate.endpoint,
+        candidate.apiKey,
+        candidate.model,
+        effectiveTimeout,
         payload,
-        'Groq',
+        candidate.provider,
         fetchFn
       );
 
-      if (groqRes.ok) {
-        console.info('Answered by provider: Groq');
-        return groqRes.data;
+      if (res.ok) {
+        console.log(`Answered by model: ${candidate.model}`);
+        return res.data;
       }
 
-      console.warn(`Provider Groq failed with status: ${groqRes.status ?? 'network_error'}`);
+      // تسجيل الفشل
+      console.warn(`Provider ${candidate.provider} model ${candidate.model} failed with status: ${res.status ?? res.error}`);
+      lastError = `${candidate.provider} ${candidate.model}: ${res.error}`;
 
-      if (canUseGemini && groqRes.isFailoverEligible) {
-        const geminiRes = await callProvider(
-          'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-          geminiKey!,
-          geminiModel,
-          25_000,
-          payload,
-          'Gemini',
-          fetchFn
-        );
-
-        if (geminiRes.ok) {
-          console.info('Answered by provider: Gemini');
-          return geminiRes.data;
+      // تتبع أخطاء 429 المتتالية في Gemini لتعطيل المجموعة
+      if (candidate.provider === 'Gemini' && res.status === 429) {
+        consecutiveGemini429s += 1;
+        if (consecutiveGemini429s >= 2) {
+          geminiGroupCooldownUntil = Date.now() + 300_000; // 5 دقائق
+          console.warn('Gemini project-level 429 detected; cooling down all Gemini models for 5 minutes.');
         }
-
-        console.warn(`Provider Gemini failed with status: ${geminiRes.status ?? 'network_error'}`);
-        throw new Error(`Both Groq and Gemini failed. Gemini error: ${geminiRes.error}`);
+      } else if (candidate.provider === 'Gemini') {
+        consecutiveGemini429s = 0;
       }
 
-      throw new Error(`Groq failed: ${groqRes.error}`);
-    }
-
-    if (canUseGemini) {
-      const geminiRes = await callProvider(
-        'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-        geminiKey!,
-        geminiModel,
-        25_000,
-        payload,
-        'Gemini',
-        fetchFn
-      );
-
-      if (geminiRes.ok) {
-        console.info('Answered by provider: Gemini');
-        return geminiRes.data;
+      // إذا كان الخطأ غير مؤهل للتحويل (مثل 400 عادي لطلب مشوه) فلا تنتقل للنموذج التالي
+      if (!res.isFailoverEligible) {
+        throw new Error(`Unrecoverable error from ${candidate.provider} model ${candidate.model}: ${res.error}`);
       }
-
-      console.warn(`Provider Gemini failed with status: ${geminiRes.status ?? 'network_error'}`);
-      throw new Error(`Gemini failed: ${geminiRes.error}`);
     }
 
-    throw new Error('No AI provider configured or available.');
+    throw new Error(`All model attempts failed or timed out. Last error: ${lastError ?? 'unknown'}`);
   };
 }
-
-export const getGroqCooldownUntil = () => groqCooldownUntil;
-export const setGroqCooldownUntil = (val: number) => { groqCooldownUntil = val; };
 
 export const handler = async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -234,8 +319,8 @@ export const handler = async (request: Request) => {
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const groqKey = Deno.env.get('GROQ_API_KEY');
   const geminiKey = Deno.env.get('GEMINI_API_KEY');
-  const groqModel = Deno.env.get('GROQ_MODEL') || 'llama-3.3-70b-versatile';
-  const geminiModel = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash';
+  const groqModels = parseModelList(Deno.env.get('GROQ_MODELS'), DEFAULT_GROQ_MODELS);
+  const geminiModels = parseModelList(Deno.env.get('GEMINI_MODELS'), DEFAULT_GEMINI_MODELS);
 
   if (!url || !anonKey) return json({ error: 'إعدادات خادم Supabase غير مكتملة.' }, 500);
   if (!groqKey && !geminiKey) return json({ error: 'لم يتم إعداد GROQ_API_KEY أو GEMINI_API_KEY في Supabase Secrets.' }, 503);
@@ -338,8 +423,8 @@ export const handler = async (request: Request) => {
     const callModelInternal = createModelCaller({
       groqKey: groqKey || undefined,
       geminiKey: geminiKey || undefined,
-      groqModel,
-      geminiModel,
+      groqModels,
+      geminiModels,
     });
 
     const callModel = (includeTools: boolean) =>
