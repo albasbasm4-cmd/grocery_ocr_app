@@ -86,8 +86,9 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: 8. Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: 8. Accept Android SDK Licenses
+        run: |
+          yes | sdkmanager --licenses || true
 
       - name: 9. Prepare Release Keystore (if Secrets exist)
         env:
