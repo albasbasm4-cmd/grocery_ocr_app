@@ -79,11 +79,11 @@ jobs:
       - name: 6. Sync Capacitor Android
         run: npx cap sync android
 
-      - name: 7. Setup Java 17 (Temurin)
+      - name: 7. Setup Java 21 (Temurin)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
           cache: 'gradle'
 
       - name: 8. Accept Android SDK Licenses
