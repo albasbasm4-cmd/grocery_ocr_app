@@ -9,7 +9,6 @@ import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { PinPromptModal } from '../components/PinPromptModal';
 import { ProductDetailModal } from '../components/products/ProductDetailModal';
 import { ProductForm } from '../components/products/ProductForm';
 import { StockAdjustmentModal } from '../components/products/StockAdjustmentModal';
@@ -43,9 +42,9 @@ function filterLabel(filter: FilterType): string {
 }
 
 export default function ProductsPage() {
-  const { store, role } = useAuth();
+  const { store } = useAuth();
   const { formatNumber, formatCurrency } = useSettings();
-  const { isOwner } = usePermissions();
+  const { isOwner, canSeeCost, canEditProducts, canAddProducts, canToggleProductActive, canAdjustStock } = usePermissions();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -60,12 +59,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
-  const [pinOpen, setPinOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<null | (() => Promise<void>)>(null);
-  const [pendingStock, setPendingStock] = useState<{ product: Product; quantity: string; reason: string } | null>(null);
-  const [formDraft, setFormDraft] = useState<ProductInput | null>(null);
-  const [actionProduct, setActionProduct] = useState<Product | null>(null);
-  const [nextActiveState, setNextActiveState] = useState<boolean | null>(null);
+
   const observerRef = useRef<HTMLDivElement | null>(null);
 
   const categoriesQuery = useQuery({
@@ -137,22 +131,15 @@ export default function ProductsPage() {
     setFormOpen(true);
   };
   const onProductSubmit = async (input: ProductInput) => {
-    setFormDraft(input);
-    setPinOpen(true);
-  };
-  const confirmProductSubmit = async () => {
-    if (!formDraft) return;
-    if (editingProduct) await updateMutation.mutateAsync({ product: editingProduct, input: formDraft });
-    else await createMutation.mutateAsync(formDraft);
-    setFormDraft(null);
+    if (editingProduct) await updateMutation.mutateAsync({ product: editingProduct, input });
+    else await createMutation.mutateAsync(input);
     setFormOpen(false);
     setEditingProduct(null);
   };
-  const requestProductStateChange = (product: Product) => {
+  const requestProductStateChange = async (product: Product) => {
+    if (!canToggleProductActive) return;
     if (!ensureOnlineWithToast(ar.actionOnlineToggleProduct, showToast)) return;
-    setActionProduct(product);
-    setNextActiveState(!product.is_active);
-    setPinOpen(true);
+    await activeMutation.mutateAsync({ product, isActive: !product.is_active });
   };
   const requestStockAdjustment = (product: Product) => {
     if (!ensureOnlineWithToast(ar.actionOnlineAdjustStock, showToast)) return;
@@ -170,22 +157,7 @@ export default function ProductsPage() {
     return () => observer.disconnect();
   }, [loadMore, productsQuery.fetchNextPage]);
 
-  const onPinSuccess = async () => {
-    try {
-      if (formDraft) await confirmProductSubmit();
-      else if (actionProduct && nextActiveState !== null) {
-        await activeMutation.mutateAsync({ product: actionProduct, isActive: nextActiveState });
-        setActionProduct(null);
-        setNextActiveState(null);
-      } else if (pendingStock) {
-        await stockMutation.mutateAsync(pendingStock);
-        setPendingStock(null);
-        setStockProduct(null);
-      } else if (pendingAction) await pendingAction();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : ar.genericError, 'error');
-    }
-  };
+
 
   const groupedProducts = useMemo(() => {
     const categoryById = new Map(categories.map((category) => [category.id, category]));
@@ -201,7 +173,7 @@ export default function ProductsPage() {
       .sort((a, b) => compareArabic(a.category?.name || ar.allCategories, b.category?.name || ar.allCategories));
   }, [products, categories]);
 
-  const canSeeCost = role === 'owner';
+  
 
   return (
     <div className="space-y-4 pb-4" dir="rtl">
@@ -295,11 +267,15 @@ export default function ProductsPage() {
                     </div>
                     <div className="flex shrink-0 gap-1">
                       <button className="touch-target rounded-lg p-2 text-slate-400 hover:bg-slate-800" onClick={() => setDetailProduct(product)} aria-label={ar.productDetails}><Eye className="h-4 w-4" /></button>
-                      {isOwner && <>
+                      {canEditProducts && (
                         <button className="touch-target rounded-lg p-2 text-slate-400 hover:bg-slate-800" onClick={() => openEdit(product)} aria-label={ar.editProduct}><Pencil className="h-4 w-4" /></button>
+                      )}
+                      {canAdjustStock && (
                         <button className="touch-target rounded-lg p-2 text-amber-300 hover:bg-slate-800" onClick={() => requestStockAdjustment(product)} aria-label={ar.adjustStock}><Warehouse className="h-4 w-4" /></button>
-                        <button className="touch-target rounded-lg p-2 text-rose-300 hover:bg-slate-800" onClick={() => requestProductStateChange(product)} aria-label={product.is_active ? ar.deactivateProduct : ar.activateProduct}><Archive className="h-4 w-4" /></button>
-                      </>}
+                      )}
+                      {canToggleProductActive && (
+                        <button className="touch-target rounded-lg p-2 text-rose-300 hover:bg-slate-800" onClick={() => void requestProductStateChange(product)} aria-label={product.is_active ? ar.deactivateProduct : ar.activateProduct}><Archive className="h-4 w-4" /></button>
+                      )}
                     </div>
                   </div>
                   {product.expiry_date && <p className="text-xs text-amber-300">{ar.expiryDate}: {product.expiry_date}</p>}
@@ -316,7 +292,7 @@ export default function ProductsPage() {
         void lookupProductsByCode(store?.id || '', code).then((found) => {
           if (found.length === 1) setDetailProduct(found[0]!);
           else if (found.length > 1) showToast(ar.chooseProduct, 'info');
-          else if (isOwner) { setFormOpen(true); setEditingProduct(null); setScannedBarcode(code); }
+          else if (canAddProducts) { setFormOpen(true); setEditingProduct(null); setScannedBarcode(code); }
           else showToast(ar.codeNotFoundStaff, 'error');
         }).catch((error: unknown) => showToast(error instanceof Error ? error.message : ar.genericError, 'error'));
       }} onProduct={(product) => setDetailProduct(product)} />
@@ -324,10 +300,9 @@ export default function ProductsPage() {
       <ProductDetailModal product={detailProduct} isOpen={Boolean(detailProduct)} onClose={() => setDetailProduct(null)} canSeeCost={canSeeCost} />
       <StockAdjustmentModal product={stockProduct} isOpen={Boolean(stockProduct)} onClose={() => setStockProduct(null)} isSaving={stockMutation.isPending} onSubmit={async (quantity, reason) => {
         if (!stockProduct) return;
-        setPendingStock({ product: stockProduct, quantity, reason });
-        setPinOpen(true);
+        await stockMutation.mutateAsync({ product: stockProduct, quantity, reason });
+        setStockProduct(null);
       }} />
-      <PinPromptModal isOpen={pinOpen} onClose={() => { setPinOpen(false); setFormDraft(null); setActionProduct(null); setNextActiveState(null); setPendingAction(null); setPendingStock(null); }} onSuccess={onPinSuccess} />
 
       {isOwner && (
         <ImportProductsModal

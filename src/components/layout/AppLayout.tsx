@@ -8,7 +8,7 @@ import { ar } from '../../i18n/ar';
 import { Store, ShieldCheck, Clock, Bot } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
-  const { store, role, pinExpiresAt } = useAuth();
+  const { store, stores, role, pinExpiresAt, switchStore } = useAuth();
   const [now, setNow] = useState(Date.now());
 
   // تفعيل دعم زر الرجوع بهواتف أندرويد
@@ -36,9 +36,26 @@ export const AppLayout: React.FC = () => {
               <Store className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-white leading-tight truncate max-w-[150px] sm:max-w-xs">
-                {store?.name ?? ar.appName}
-              </h1>
+              {stores.length > 1 ? (
+                <div className="flex items-center gap-1">
+                  <select
+                    className="bg-slate-800 text-white font-bold text-xs rounded-lg px-2 py-1 border border-slate-700 outline-none max-w-[150px] sm:max-w-xs truncate cursor-pointer"
+                    value={store?.id || ''}
+                    onChange={(e) => void switchStore(e.target.value)}
+                    aria-label={ar.switchStore}
+                  >
+                    {stores.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.id === store?.id ? (role === 'owner' ? ar.owner : ar.staff) : ''})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <h1 className="text-base font-bold text-white leading-tight truncate max-w-[150px] sm:max-w-xs">
+                  {store?.name ?? ar.appName}
+                </h1>
+              )}
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
                   className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${

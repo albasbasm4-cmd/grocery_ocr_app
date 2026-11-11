@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { PinPromptModal } from '../PinPromptModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { voidSale } from '../../services/salesService';
 import { ar } from '../../i18n/ar';
@@ -21,11 +20,10 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({
   sale,
   onSuccess,
 }) => {
-  const { isOwner, hasActivePinSession } = useAuth();
+  const { isOwner } = useAuth();
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
 
   if (!sale) return null;
 
@@ -56,12 +54,7 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({
       return;
     }
 
-    // إذا كانت جلسة الـ PIN فعالة، نفّذ مباشرة؛ وإلا اطلب الـ PIN
-    if (hasActivePinSession) {
-      void performVoid();
-    } else {
-      setIsPinModalOpen(true);
-    }
+    void performVoid();
   };
 
   return (
@@ -115,13 +108,7 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({
         </form>
       </Modal>
 
-      <PinPromptModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-        onSuccess={() => void performVoid()}
-        title={ar.voidPinModalTitle}
-        description={ar.voidPinModalDesc}
-      />
+
     </>
   );
 };

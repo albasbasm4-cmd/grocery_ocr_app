@@ -12,10 +12,11 @@
     "cap:android": "cap open android",
     "test:java-export": "tsx tests/javaExportCompileTest.ts",
     "test:offline": "tsx tests/offlineSyncTest.ts",
-    "test": "npm run test:offline && npm run test:sales && npm run test:perf && npm run test:java-export && npm run test:financial",
+    "test": "npm run test:offline && npm run test:sales && npm run test:perf && npm run test:java-export && npm run test:financial && npm run test:permissions",
     "test:perf": "tsx tests/performanceTest.ts",
     "test:sales": "tsx tests/salesAndReturnsTest.ts",
-    "test:financial": "tsx tests/financialPrecisionTest.ts"
+    "test:financial": "tsx tests/financialPrecisionTest.ts",
+    "test:permissions": "tsx tests/permissionsAndJoinFlowTest.ts"
   },
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^8.2.2",

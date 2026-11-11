@@ -3,7 +3,6 @@ import Decimal from 'decimal.js';
 import { RotateCcw } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { PinPromptModal } from '../PinPromptModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { returnItems } from '../../services/salesService';
 import { ar } from '../../i18n/ar';
@@ -27,12 +26,11 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
   numberFormat,
   onSuccess,
 }) => {
-  const { isOwner, hasActivePinSession } = useAuth();
+  const { isOwner } = useAuth();
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
 
   if (!sale) return null;
 
@@ -119,11 +117,7 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
       return;
     }
 
-    if (hasActivePinSession) {
-      void performReturn();
-    } else {
-      setIsPinModalOpen(true);
-    }
+    void performReturn();
   };
 
   return (
@@ -203,13 +197,7 @@ export const ReturnItemsModal: React.FC<ReturnItemsModalProps> = ({
         </form>
       </Modal>
 
-      <PinPromptModal
-        isOpen={isPinModalOpen}
-        onClose={() => setIsPinModalOpen(false)}
-        onSuccess={() => void performReturn()}
-        title={ar.pinConfirmOwnerTitle}
-        description={ar.pinConfirmReturnDesc}
-      />
+
     </>
   );
 };

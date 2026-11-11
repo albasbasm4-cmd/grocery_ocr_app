@@ -15,8 +15,6 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { Card } from '../ui/Card';
-import { PinPromptModal } from '../PinPromptModal';
-import { usePermissions } from '../../hooks/usePermissions';
 import { ar } from '../../i18n/ar';
 import {
   ColumnMapping,
@@ -48,7 +46,6 @@ export function ImportProductsModal({
   storeId,
   onSuccess,
 }: ImportProductsModalProps) {
-  const { pinActive } = usePermissions();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>('file');
@@ -85,8 +82,6 @@ export function ImportProductsModal({
   });
 
   const [importResult, setImportResult] = useState<BulkUpsertResult | null>(null);
-  const [pinPromptOpen, setPinPromptOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<null | (() => Promise<void>)>(null);
 
   // إعادة ضبط الحالة عند فتح النافذة
   useEffect(() => {
@@ -143,13 +138,6 @@ export function ImportProductsModal({
   const handleStartImport = async () => {
     if (!validation || validation.validRows.length === 0) return;
 
-    // التحقق من جلسة PIN للمالك
-    if (!pinActive) {
-      setPendingAction(() => executeImport);
-      setPinPromptOpen(true);
-      return;
-    }
-
     await executeImport();
   };
 
@@ -191,14 +179,7 @@ export function ImportProductsModal({
     }
   };
 
-  const onPinSuccess = async () => {
-    setPinPromptOpen(false);
-    if (pendingAction) {
-      const act = pendingAction;
-      setPendingAction(null);
-      await act();
-    }
-  };
+
 
   return (
     <>
@@ -590,14 +571,7 @@ export function ImportProductsModal({
         </div>
       </Modal>
 
-      {/* نافذة التحقق من رمز PIN للمالك */}
-      {pinPromptOpen && (
-        <PinPromptModal
-          isOpen={pinPromptOpen}
-          onClose={() => setPinPromptOpen(false)}
-          onSuccess={onPinSuccess}
-        />
-      )}
+
     </>
   );
 }

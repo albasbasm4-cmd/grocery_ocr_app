@@ -64,7 +64,7 @@ function AuthRoutes() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/products" element={<ProductsPage />} />
-          <Route path="/categories" element={<OwnerCategoriesRoute />} />
+          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/pos" element={<PosPage />} />
           <Route path="/sales" element={<SalesPage />} />
           <Route path="/customers" element={<CustomersPage />} />
@@ -83,11 +83,6 @@ function AuthRoutes() {
   );
 }
 
-function OwnerCategoriesRoute() {
-  const { isOwner } = usePermissions();
-  if (!isOwner) return <Navigate to="/unauthorized" replace />;
-  return <CategoriesPage />;
-}
 
 function OwnerJavaExportRoute() {
   const { isOwner } = usePermissions();

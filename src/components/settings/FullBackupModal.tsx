@@ -3,8 +3,6 @@ import { Database, Download, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
-import { PinPromptModal } from '../PinPromptModal';
-import { usePermissions } from '../../hooks/usePermissions';
 import { ar } from '../../i18n/ar';
 import { exportFullStoreBackup } from '../../services/importExportService';
 
@@ -21,17 +19,11 @@ export function FullBackupModal({
   storeId,
   storeName,
 }: FullBackupModalProps) {
-  const { pinActive } = usePermissions();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [pinPromptOpen, setPinPromptOpen] = useState(false);
 
   const startBackupFlow = () => {
-    if (!pinActive) {
-      setPinPromptOpen(true);
-      return;
-    }
     executeBackup();
   };
 
@@ -54,10 +46,7 @@ export function FullBackupModal({
     }
   };
 
-  const onPinSuccess = async () => {
-    setPinPromptOpen(false);
-    await executeBackup();
-  };
+
 
   return (
     <>
@@ -118,13 +107,7 @@ export function FullBackupModal({
         </div>
       </Modal>
 
-      {pinPromptOpen && (
-        <PinPromptModal
-          isOpen={pinPromptOpen}
-          onClose={() => setPinPromptOpen(false)}
-          onSuccess={onPinSuccess}
-        />
-      )}
+
     </>
   );
 }

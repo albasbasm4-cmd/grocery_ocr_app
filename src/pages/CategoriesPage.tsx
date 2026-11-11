@@ -4,7 +4,6 @@ import { Pencil, Plus, Trash2, FolderOpen } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
-import { PinPromptModal } from '../components/PinPromptModal';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { useToast } from '../contexts/ToastContext';
@@ -15,14 +14,12 @@ import type { Category } from '../types';
 
 export default function CategoriesPage() {
   const { store } = useAuth();
-  const { isOwner } = usePermissions();
+  const { canEditProducts, canDeleteProducts } = usePermissions();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [categoryName, setCategoryName] = useState('');
-  const [pinOpen, setPinOpen] = useState(false);
-  const [pinAction, setPinAction] = useState<null | (() => Promise<void>)>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
   const [deleteProductCount, setDeleteProductCount] = useState(0);
 
@@ -78,13 +75,7 @@ export default function CategoriesPage() {
       showToast(ar.categoryNameRequired, 'error');
       return;
     }
-    if (editingCategory) {
-      setPinAction(() => async () => { await saveMutation.mutateAsync(); });
-      setPinOpen(true);
-    } else {
-      setPinAction(() => async () => { await saveMutation.mutateAsync(); });
-      setPinOpen(true);
-    }
+    void saveMutation.mutateAsync();
   };
 
   const handleDeleteRequest = async (category: Category) => {
@@ -111,7 +102,7 @@ export default function CategoriesPage() {
           <h1 className="text-xl font-extrabold text-white">{ar.manageCategories}</h1>
           <p className="mt-1 text-xs text-slate-400">{ar.noCategories}</p>
         </div>
-        {isOwner && <Button icon={<Plus className="h-4 w-4" />} onClick={openNew}>{ar.addCategory}</Button>}
+        {canEditProducts && <Button icon={<Plus className="h-4 w-4" />} onClick={openNew}>{ar.addCategory}</Button>}
       </div>
 
       {categoriesQuery.isLoading ? (
@@ -130,12 +121,14 @@ export default function CategoriesPage() {
                 <h2 className="truncate font-bold text-white">{category.name}</h2>
                 <p className="mt-1 text-xs text-slate-500">{category.name_normalized}</p>
               </div>
-              {isOwner && (
-                <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
+                {canEditProducts && (
                   <Button size="sm" variant="outline" icon={<Pencil className="h-4 w-4" />} onClick={() => openEdit(category)}>{ar.editProduct}</Button>
+                )}
+                {canDeleteProducts && (
                   <Button size="sm" variant="danger" icon={<Trash2 className="h-4 w-4" />} onClick={() => void handleDeleteRequest(category)}>{ar.deleteCategory}</Button>
-                </div>
-              )}
+                )}
+              </div>
             </Card>
           ))}
         </div>
@@ -163,15 +156,13 @@ export default function CategoriesPage() {
             </p>
             {deleteProductCount === 0 && (
               <div className="flex gap-2">
-                <Button variant="danger" isLoading={deleteMutation.isPending} onClick={() => { setPinAction(() => async () => deleteMutation.mutateAsync(deleting)); setPinOpen(true); }}>{ar.deleteCategory}</Button>
+                <Button variant="danger" isLoading={deleteMutation.isPending} onClick={() => void deleteMutation.mutateAsync(deleting)}>{ar.deleteCategory}</Button>
                 <Button variant="outline" onClick={() => setDeleting(null)}>{ar.cancel}</Button>
               </div>
             )}
           </div>
         )}
       </Modal>
-
-      <PinPromptModal isOpen={pinOpen} onClose={() => setPinOpen(false)} onSuccess={() => { if (pinAction) void pinAction().catch((error: unknown) => showToast(error instanceof Error ? error.message : ar.genericError, 'error')); }} />
     </div>
   );
 }

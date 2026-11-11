@@ -7,8 +7,21 @@ import { Home, Package, ShoppingCart, BarChart3, Settings } from 'lucide-react';
 import { ar } from '../../i18n/ar';
 
 export const BottomNav: React.FC = () => {
-  const { store } = useAuth();
+  const { store, role } = useAuth();
   const location = useLocation();
+  const { data: pendingRequestsCount = 0 } = useQuery({
+    queryKey: ['nav-pending-requests', store?.id],
+    queryFn: async () => {
+      if (!store?.id || role !== 'owner') return 0;
+      const { data, error } = await supabase.rpc('get_store_join_requests', { p_store_id: store.id });
+      if (error) return 0;
+      const list = (data as Array<{ status: string }>) || [];
+      return list.filter((r) => r.status === 'pending').length;
+    },
+    enabled: Boolean(store?.id && role === 'owner'),
+    staleTime: 60_000,
+  });
+
   const { data: lowStockCount = 0 } = useQuery({
     queryKey: ['nav-low-stock', store?.id],
     queryFn: async () => {
@@ -93,7 +106,14 @@ export const BottomNav: React.FC = () => {
             }`
           }
         >
-          <Settings className="w-5 h-5 mb-1" />
+          <span className="relative">
+            <Settings className="w-5 h-5 mb-1" />
+            {pendingRequestsCount > 0 && (
+              <span className="absolute -left-2 -top-1 min-w-4 rounded-full bg-emerald-400 px-1 text-center text-[9px] font-black text-slate-950">
+                {pendingRequestsCount > 99 ? '99+' : pendingRequestsCount}
+              </span>
+            )}
+          </span>
           <span className="text-[11px] leading-none">{ar.navSettings}</span>
         </NavLink>
       </div>
